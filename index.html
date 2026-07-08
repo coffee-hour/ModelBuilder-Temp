@@ -27,7 +27,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 200px;
+            width: 220px;
         }
         .panel {
             background: var(--panel-bg);
@@ -49,6 +49,7 @@
             font-size: 13px;
             font-weight: 500;
             transition: background 0.2s;
+            text-align: center;
         }
         button:hover {
             background: #2563eb;
@@ -58,6 +59,15 @@
         }
         button.secondary:hover {
             background: #525252;
+        }
+        button.active {
+            background: #1d4ed8;
+            outline: 2px solid white;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
         }
         canvas {
             display: block;
@@ -69,20 +79,37 @@
             color: #9ca3af;
             margin-bottom: 4px;
         }
+        .info {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="ui">
         <div class="panel">
             <div class="label">Geometry</div>
-            <button onclick="addBox()">Add Box</button>
-            <button onclick="addSphere()">Add Sphere</button>
+            <div class="btn-group">
+                <button onclick="addBox()">Box</button>
+                <button onclick="addSphere()">Sphere</button>
+            </div>
         </div>
         <div class="panel">
-            <div class="label">I/O</div>
-            <button class="secondary" onclick="exportModel()">Export (OBJ)</button>
-            <input type="file" id="fileInput" style="display:none" onchange="importModel(event)">
-            <button class="secondary" onclick="document.getElementById('fileInput').click()">Upload</button>
+            <div class="label">Transform Mode</div>
+            <div class="btn-group">
+                <button id="btn-translate" class="active" onclick="setTransformMode('translate')">Move</button>
+                <button id="btn-rotate" onclick="setTransformMode('rotate')">Rotate</button>
+                <button id="btn-scale" onclick="setTransformMode('scale')">Scale</button>
+                <button class="secondary" onclick="deleteSelected()">Delete</button>
+            </div>
+            <div class="info">Click object to select</div>
+        </div>
+        <div class="panel">
+            <div class="label">File</div>
+            <button class="secondary" onclick="exportModel()">Export OBJ</button>
+            <input type="file" id="fileInput" style="display:none" accept=".obj" onchange="importModel(event)">
+            <button class="secondary" onclick="document.getElementById('fileInput').click()">Import OBJ</button>
         </div>
     </div>
     <script type="importmap">
