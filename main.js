@@ -85,18 +85,12 @@ function selectObject(obj) {
     
     if (obj) {
         transformControls.attach(obj);
-        
-        // Check for morph targets in children
         const morphTargets = [];
         obj.traverse((child) => {
             if (child.isMesh && child.morphTargetInfluences) {
                 const names = child.morphTargetDictionary ? Object.keys(child.morphTargetDictionary) : [];
-                names.forEach((name, index) => {
-                    morphTargets.push({
-                        mesh: child,
-                        name: name,
-                        index: index
-                    });
+                names.forEach((name) => {
+                    morphTargets.push({ mesh: child, name: name });
                 });
             }
         });
@@ -104,43 +98,22 @@ function selectObject(obj) {
         if (morphTargets.length > 0) {
             traitsPanel.style.display = 'block';
             morphContainer.innerHTML = '';
-            
-            // Deduplicate morph target names for UI (many meshes might share same targets)
             const uniqueTargets = [...new Set(morphTargets.map(t => t.name))];
-            
             uniqueTargets.forEach(targetName => {
                 const row = document.createElement('div');
                 row.className = 'trait-row';
-                
-                const header = document.createElement('div');
-                header.className = 'trait-header';
-                header.innerHTML = `<span>${targetName}</span><span id="val-${targetName}">0.00</span>`;
-                
-                const slider = document.createElement('input');
-                slider.type = 'range';
-                slider.min = '0';
-                slider.max = '1';
-                slider.step = '0.01';
-                
-                // Set initial value from first mesh that has this target
                 const firstMesh = morphTargets.find(t => t.name === targetName).mesh;
-                const targetIndex = firstMesh.morphTargetDictionary[targetName];
-                slider.value = firstMesh.morphTargetInfluences[targetIndex];
-                header.querySelector(`#val-${targetName}`).innerText = Number(slider.value).toFixed(2);
-
+                const idx = firstMesh.morphTargetDictionary[targetName];
+                row.innerHTML = `<div class="trait-header"><span>${targetName}</span><span id="val-${targetName}">${firstMesh.morphTargetInfluences[idx].toFixed(2)}</span></div>
+                                 <input type="range" min="0" max="1" step="0.01" value="${firstMesh.morphTargetInfluences[idx]}">`;
+                const slider = row.querySelector('input');
                 slider.oninput = (e) => {
                     const val = parseFloat(e.target.value);
-                    header.querySelector(`#val-${targetName}`).innerText = val.toFixed(2);
-                    
-                    // Update all meshes in the model that have this target
+                    row.querySelector(`#val-${targetName}`).innerText = val.toFixed(2);
                     morphTargets.filter(t => t.name === targetName).forEach(t => {
-                        const idx = t.mesh.morphTargetDictionary[targetName];
-                        t.mesh.morphTargetInfluences[idx] = val;
+                        t.mesh.morphTargetInfluences[t.mesh.morphTargetDictionary[targetName]] = val;
                     });
                 };
-                
-                row.appendChild(header);
-                row.appendChild(slider);
                 morphContainer.appendChild(row);
             });
         } else {
@@ -191,21 +164,12 @@ window.deleteSelected = function() {
         scene.remove(selectedObject);
         transformControls.detach();
         selectedObject = null;
-        document.getElementById('traits-panel').style.display = 'none';
     }
 };
 
 window.exportModel = function() {
-    // Note: OBJExporter doesn't natively bake morph targets.
-    // We must pass the "current" mesh state.
     const exportGroup = new THREE.Group();
-    objects.forEach(obj => {
-        const clone = obj.clone();
-        // Traverse and apply morphing to positions for export if possible
-        // Actually OBJExporter in Three.js will use current vertex positions if we use the right options
-        exportGroup.add(clone);
-    });
-    
+    objects.forEach(obj => exportGroup.add(obj.clone()));
     const exporter = new OBJExporter();
     const result = exporter.parse(exportGroup);
     const blob = new Blob([result], { type: 'text/plain' });
@@ -218,51 +182,114 @@ window.exportModel = function() {
 window.handleImport = function(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     const extension = file.name.split('.').pop().toLowerCase();
     const reader = new FileReader();
-
     reader.onload = function(e) {
-        const contents = e.target.result;
-        
         if (extension === 'obj') {
             const loader = new OBJLoader();
-            processImportedObject(loader.parse(contents));
-        } 
-        else if (extension === 'stl') {
+            processImportedObject(loader.parse(e.target.result));
+        } else if (extension === 'stl') {
             const loader = new STLLoader();
-            const geometry = loader.parse(contents);
-            const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
-            const mesh = new THREE.Mesh(geometry, material);
-            processImportedObject(mesh);
-        }
-        else if (extension === 'gltf' || extension === 'glb') {
+            const geometry = loader.parse(e.target.result);
+            processImportedObject(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x3b82f6 })));
+        } else if (extension === 'gltf' || extension === 'glb') {
             const loader = new GLTFLoader();
-            loader.parse(contents, '', (gltf) => {
-                processImportedObject(gltf.scene);
-            }, (err) => console.error(err));
+            loader.parse(e.target.result, '', (gltf) => processImportedObject(gltf.scene));
         }
     };
-
-    if (extension === 'glb' || extension === 'stl') {
-        reader.readAsArrayBuffer(file);
-    } else {
-        reader.readAsText(file);
-    }
-    
+    if (extension === 'glb' || extension === 'stl') reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
     event.target.value = '';
 };
+
+window.handleTripoImage = async function(event) {
+    const file = event.target.files[0];
+    const key = document.getElementById('tripoKey').value;
+    const status = document.getElementById('tripoStatus');
+    const btn = document.getElementById('tripoBtn');
+
+    if (!file || !key) {
+        alert("Please provide both an image and your Tripo3D API Key.");
+        return;
+    }
+
+    status.innerText = "Uploading image...";
+    btn.disabled = true;
+
+    try {
+        // Step 1: Upload to Tripo (simulated with FormData for actual API usage)
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadRes = await fetch('https://api.tripo3d.ai/v1/upload', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${key}` },
+            body: formData
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData.code !== 0) throw new Error(uploadData.message);
+        
+        const imageToken = uploadData.data.image_token;
+
+        // Step 2: Create Task
+        status.innerText = "Starting AI task...";
+        const taskRes = await fetch('https://api.tripo3d.ai/v1/task', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+                type: "image_to_model",
+                file: { type: "jpg", file_token: imageToken }
+            })
+        });
+        const taskData = await taskRes.json();
+        if (taskData.code !== 0) throw new Error(taskData.message);
+        
+        const taskId = taskData.data.task_id;
+
+        // Step 3: Polling
+        const pollInterval = setInterval(async () => {
+            status.innerText = "Processing AI model (polling)...";
+            const res = await fetch(`https://api.tripo3d.ai/v1/task/${taskId}`, {
+                headers: { 'Authorization': `Bearer ${key}` }
+            });
+            const data = await res.json();
+            
+            if (data.data.status === 'success') {
+                clearInterval(pollInterval);
+                status.innerText = "Success! Loading model...";
+                btn.disabled = false;
+                loadTripoModel(data.data.output.model);
+            } else if (data.data.status === 'failed') {
+                clearInterval(pollInterval);
+                status.innerText = "AI Task failed.";
+                btn.disabled = false;
+            }
+        }, 3000);
+
+    } catch (err) {
+        console.error(err);
+        status.innerText = "Error: " + err.message;
+        btn.disabled = false;
+    }
+};
+
+async function loadTripoModel(url) {
+    const loader = new GLTFLoader();
+    loader.load(url, (gltf) => {
+        processImportedObject(gltf.scene);
+    });
+}
 
 window.handleImageImport = function(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
-        img.onload = function() {
-            create3DFromImage(img);
-        };
+        img.onload = () => create3DFromImage(img);
         img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -274,50 +301,29 @@ function create3DFromImage(img) {
     const ctx = canvas.getContext('2d');
     const width = 128;
     const height = Math.round((img.height / img.width) * width);
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = width; canvas.height = height;
     ctx.drawImage(img, 0, 0, width, height);
     const imageData = ctx.getImageData(0, 0, width, height).data;
     const geometry = new THREE.PlaneGeometry(width / 10, height / 10, width - 1, height - 1);
-    const positions = geometry.attributes.position.array;
+    const pos = geometry.attributes.position.array;
     for (let i = 0; i < imageData.length / 4; i++) {
-        const r = imageData[i * 4];
-        const g = imageData[i * 4 + 1];
-        const b = imageData[i * 4 + 2];
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        positions[i * 3 + 2] = luminance * 2;
+        pos[i * 3 + 2] = ((0.299 * imageData[i*4] + 0.587 * imageData[i*4+1] + 0.114 * imageData[i*4+2]) / 255) * 2;
     }
     geometry.computeVertexNormals();
-    const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x3b82f6, side: THREE.DoubleSide }));
     mesh.rotation.x = -Math.PI / 2;
     processImportedObject(mesh);
 }
 
 function processImportedObject(object) {
-    // Only apply standard material if no materials exist (keep GLTF materials for morph targets)
-    object.traverse((child) => {
-        if (child.isMesh && !child.material) {
-            child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
-        }
-    });
-
+    object.traverse((child) => { if (child.isMesh && !child.material) child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 }); });
     const box = new THREE.Box3().setFromObject(object);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-
-    const maxDim = Math.max(size.x, size.y, size.z);
-    if (maxDim > 0) {
-        const scale = 2 / maxDim;
-        object.scale.set(scale, scale, scale);
-    }
-
-    object.position.x -= center.x * object.scale.x;
-    object.position.y -= (center.y - size.y / 2) * object.scale.y;
-    object.position.z -= center.z * object.scale.z;
-
+    const size = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
+    const scale = size.length() > 0 ? 2 / Math.max(size.x, size.y, size.z) : 1;
+    object.scale.set(scale, scale, scale);
+    object.position.sub(center.multiplyScalar(scale));
+    object.position.y += (size.y * scale) / 2;
     scene.add(object);
     objects.push(object);
     selectObject(object);

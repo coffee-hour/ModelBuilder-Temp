@@ -49,6 +49,14 @@
             gap: 10px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+        input[type="text"], input[type="password"] {
+            background: #1a1a1a;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: white;
+            padding: 6px;
+            font-size: 12px;
+        }
         button {
             background: var(--accent-color);
             color: white;
@@ -63,6 +71,10 @@
         }
         button:hover {
             background: #2563eb;
+        }
+        button:disabled {
+            background: #404040;
+            cursor: not-allowed;
         }
         button.secondary {
             background: #404040;
@@ -108,13 +120,18 @@
             accent-color: var(--accent-color);
         }
         #morph-targets-container {
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
         }
     </style>
 </head>
 <body>
     <div id="ui">
+        <div class="panel">
+            <div class="label">API Config</div>
+            <input type="password" id="tripoKey" placeholder="Tripo3D API Key">
+            <div class="info">Enter your key to enable AI generation.</div>
+        </div>
         <div class="panel">
             <div class="label">Geometry</div>
             <div class="btn-group">
@@ -134,18 +151,22 @@
         <div id="traits-panel" class="panel" style="display:none">
             <div class="label">Edit Traits</div>
             <div id="morph-targets-container"></div>
-            <div class="info">Adjust sliders to modify physical traits via morph targets.</div>
         </div>
         <div class="panel">
-            <div class="label">Import / Convert</div>
+            <div class="label">Import / AI Generation</div>
             <input type="file" id="importInput" style="display:none" accept=".obj,.stl,.gltf,.glb" onchange="handleImport(event)">
             <button class="secondary" onclick="document.getElementById('importInput').click()">Load 3D File</button>
-            <div class="info">Supports OBJ, STL, GLTF/GLB (human models).</div>
+            
+            <hr style="border:0; border-top:1px solid #404040; margin: 10px 0;">
+            
+            <input type="file" id="tripoImageInput" style="display:none" accept="image/*" onchange="handleTripoImage(event)">
+            <button id="tripoBtn" onclick="document.getElementById('tripoImageInput').click()">AI Generate (Tripo3D)</button>
+            <div id="tripoStatus" class="info">Upload image to start AI task.</div>
         </div>
         <div class="panel">
-            <div class="label">Image to 3D (Extrude)</div>
+            <div class="label">Simple Extrude</div>
             <input type="file" id="imageInput" style="display:none" accept="image/*" onchange="handleImageImport(event)">
-            <button class="secondary" onclick="document.getElementById('imageInput').click()">Load Image</button>
+            <button class="secondary" onclick="document.getElementById('imageInput').click()">Height Map Extrude</button>
         </div>
         <div class="panel">
             <div class="label">Export</div>
