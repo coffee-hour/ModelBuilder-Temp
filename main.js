@@ -1,12 +1,12 @@
 /**
- * MUD Logic & GAS Integration
+ * MUD Logic & GAS Integration (Username-based)
  */
 
 // REPLACE THIS with your deployed Google Apps Script Web App URL
 const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyb6ICpsENWN3w1p2M3xb7n9mJfHWStPAxUGCPUzJ6JFI2HYOGJDPpYCF0sHwvYZCQt8g/exec';
 
 let player = {
-    id: null,
+    username: null,
     resolve: 0,
     reputation: 0,
     inventory: []
@@ -24,7 +24,7 @@ function log(text, className = '') {
 }
 
 async function api(action, payload = {}) {
-    if (GAS_ENDPOINT.includes('YOUR_GOOGLE')) {
+    if (!GAS_ENDPOINT || GAS_ENDPOINT.includes('YOUR_GOOGLE')) {
         log('Error: GAS_ENDPOINT not configured in main.js', 'error');
         return null;
     }
@@ -34,7 +34,7 @@ async function api(action, payload = {}) {
             method: 'POST',
             body: JSON.stringify({
                 action,
-                playerId: player.id,
+                username: player.username,
                 ...payload
             })
         });
@@ -45,9 +45,9 @@ async function api(action, payload = {}) {
     }
 }
 
-async function login(id) {
-    player.id = id;
-    log(`Connecting as ${id}...`, 'system');
+async function login(username) {
+    player.username = username;
+    log(`Logging in as "${username}"...`, 'system');
     const data = await api('get_player');
     if (data) {
         player.resolve = data.resolve;
@@ -55,7 +55,7 @@ async function login(id) {
         player.inventory = data.inventory;
         updateUI();
         log('\n--- SESSION START ---');
-        log('You stand at the edge of the Sunless City. Resolve is your lifeblood.');
+        log(`Welcome back, ${username}. You stand at the edge of the Sunless City.`);
         log('Commands: "explore", "rest", "inv", "clear"');
     }
 }
@@ -71,7 +71,7 @@ async function save() {
 }
 
 function updateUI() {
-    document.getElementById('stat-id').innerText = player.id;
+    document.getElementById('stat-id').innerText = player.username;
     document.getElementById('stat-resolve').innerText = player.resolve;
     document.getElementById('stat-reputation').innerText = player.reputation;
 }
@@ -114,18 +114,19 @@ const commands = {
 
 input.addEventListener('keypress', async (e) => {
     if (e.key === 'Enter') {
-        const val = input.value.trim().toLowerCase();
+        const val = input.value.trim(); // Keep case for username
         input.value = '';
         
-        if (!player.id) {
+        if (!player.username) {
             if (val) await login(val);
             return;
         }
 
-        if (commands[val]) {
-            await commands[val]();
+        const cmd = val.toLowerCase();
+        if (commands[cmd]) {
+            await commands[cmd]();
         } else {
-            log(`Unknown command: ${val}`, 'system');
+            log(`Unknown command: ${cmd}`, 'system');
         }
     }
 });

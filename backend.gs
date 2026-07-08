@@ -1,5 +1,5 @@
 /**
- * GOOGLE APPS SCRIPT BACKEND
+ * GOOGLE APPS SCRIPT BACKEND (Username-based)
  * Paste this into your Google Apps Script project (script.google.com)
  */
 
@@ -12,23 +12,27 @@ function doPost(e) {
   // Initialize sheet if it doesn't exist
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['PlayerID', 'Resolve', 'Reputation', 'Inventory', 'LastSeen']);
+    sheet.appendRow(['Username', 'Resolve', 'Reputation', 'Inventory', 'LastSeen']);
     sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#efefef');
   }
 
   try {
     const data = JSON.parse(e.postData.contents);
     const action = data.action;
-    const playerId = data.playerId;
+    const username = data.username;
+
+    if (!username) {
+      throw new Error("Username is required");
+    }
 
     if (action === 'get_player') {
-      const player = getPlayer(sheet, playerId);
+      const player = getPlayer(sheet, username);
       return ContentService.createTextOutput(JSON.stringify(player))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
     if (action === 'save_player') {
-      savePlayer(sheet, playerId, data.stats);
+      savePlayer(sheet, username, data.stats);
       return ContentService.createTextOutput(JSON.stringify({ success: true }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -38,10 +42,14 @@ function doPost(e) {
   }
 }
 
-function getPlayer(sheet, playerId) {
-  const rows = sheet.getDataRange().getValues();
+function getPlayer(sheet, username) {
+  const range = sheet.getDataRange();
+  const rows = range.getValues();
+  
+  // Search for existing username (case-insensitive check)
+  const lowerUsername = username.toLowerCase();
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] == playerId) {
+    if (rows[i][0].toString().toLowerCase() === lowerUsername) {
       return {
         resolve: rows[i][1],
         reputation: rows[i][2],
@@ -50,10 +58,10 @@ function getPlayer(sheet, playerId) {
     }
   }
   
-  // Create default new player if ID not found
+  // Create default new player if username not found
   const defaultPlayer = { resolve: 100, reputation: 0, inventory: [] };
   sheet.appendRow([
-    playerId, 
+    username, 
     defaultPlayer.resolve, 
     defaultPlayer.reputation, 
     JSON.stringify(defaultPlayer.inventory), 
@@ -62,11 +70,13 @@ function getPlayer(sheet, playerId) {
   return defaultPlayer;
 }
 
-function savePlayer(sheet, playerId, stats) {
+function savePlayer(sheet, username, stats) {
   const range = sheet.getDataRange();
   const rows = range.getValues();
+  const lowerUsername = username.toLowerCase();
+  
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] == playerId) {
+    if (rows[i][0].toString().toLowerCase() === lowerUsername) {
       // Columns: 2=Resolve, 3=Reputation, 4=Inventory, 5=LastSeen
       sheet.getRange(i + 1, 2).setValue(stats.resolve);
       sheet.getRange(i + 1, 3).setValue(stats.reputation);
@@ -75,4 +85,13 @@ function savePlayer(sheet, playerId, stats) {
       return;
     }
   }
+  
+  // Fallback: If for some reason the row was lost, recreate it
+  sheet.appendRow([
+    username, 
+    stats.resolve, 
+    stats.reputation, 
+    JSON.stringify(stats.inventory), 
+    new Date()
+  ]);
 }
