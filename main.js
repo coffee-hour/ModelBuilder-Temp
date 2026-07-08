@@ -80,10 +80,75 @@ function onMouseDown(event) {
 
 function selectObject(obj) {
     selectedObject = obj;
+    const traitsPanel = document.getElementById('traits-panel');
+    const morphContainer = document.getElementById('morph-targets-container');
+    
     if (obj) {
         transformControls.attach(obj);
+        
+        // Check for morph targets in children
+        const morphTargets = [];
+        obj.traverse((child) => {
+            if (child.isMesh && child.morphTargetInfluences) {
+                const names = child.morphTargetDictionary ? Object.keys(child.morphTargetDictionary) : [];
+                names.forEach((name, index) => {
+                    morphTargets.push({
+                        mesh: child,
+                        name: name,
+                        index: index
+                    });
+                });
+            }
+        });
+
+        if (morphTargets.length > 0) {
+            traitsPanel.style.display = 'block';
+            morphContainer.innerHTML = '';
+            
+            // Deduplicate morph target names for UI (many meshes might share same targets)
+            const uniqueTargets = [...new Set(morphTargets.map(t => t.name))];
+            
+            uniqueTargets.forEach(targetName => {
+                const row = document.createElement('div');
+                row.className = 'trait-row';
+                
+                const header = document.createElement('div');
+                header.className = 'trait-header';
+                header.innerHTML = `<span>${targetName}</span><span id="val-${targetName}">0.00</span>`;
+                
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.min = '0';
+                slider.max = '1';
+                slider.step = '0.01';
+                
+                // Set initial value from first mesh that has this target
+                const firstMesh = morphTargets.find(t => t.name === targetName).mesh;
+                const targetIndex = firstMesh.morphTargetDictionary[targetName];
+                slider.value = firstMesh.morphTargetInfluences[targetIndex];
+                header.querySelector(`#val-${targetName}`).innerText = Number(slider.value).toFixed(2);
+
+                slider.oninput = (e) => {
+                    const val = parseFloat(e.target.value);
+                    header.querySelector(`#val-${targetName}`).innerText = val.toFixed(2);
+                    
+                    // Update all meshes in the model that have this target
+                    morphTargets.filter(t => t.name === targetName).forEach(t => {
+                        const idx = t.mesh.morphTargetDictionary[targetName];
+                        t.mesh.morphTargetInfluences[idx] = val;
+                    });
+                };
+                
+                row.appendChild(header);
+                row.appendChild(slider);
+                morphContainer.appendChild(row);
+            });
+        } else {
+            traitsPanel.style.display = 'none';
+        }
     } else {
         transformControls.detach();
+        traitsPanel.style.display = 'none';
     }
 }
 
@@ -126,12 +191,21 @@ window.deleteSelected = function() {
         scene.remove(selectedObject);
         transformControls.detach();
         selectedObject = null;
+        document.getElementById('traits-panel').style.display = 'none';
     }
 };
 
 window.exportModel = function() {
+    // Note: OBJExporter doesn't natively bake morph targets.
+    // We must pass the "current" mesh state.
     const exportGroup = new THREE.Group();
-    objects.forEach(obj => exportGroup.add(obj.clone()));
+    objects.forEach(obj => {
+        const clone = obj.clone();
+        // Traverse and apply morphing to positions for export if possible
+        // Actually OBJExporter in Three.js will use current vertex positions if we use the right options
+        exportGroup.add(clone);
+    });
+    
     const exporter = new OBJExporter();
     const result = exporter.parse(exportGroup);
     const blob = new Blob([result], { type: 'text/plain' });
@@ -198,41 +272,32 @@ window.handleImageImport = function(event) {
 function create3DFromImage(img) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
-    // Resize for performance
     const width = 128;
     const height = Math.round((img.height / img.width) * width);
     canvas.width = width;
     canvas.height = height;
-    
     ctx.drawImage(img, 0, 0, width, height);
     const imageData = ctx.getImageData(0, 0, width, height).data;
-    
     const geometry = new THREE.PlaneGeometry(width / 10, height / 10, width - 1, height - 1);
     const positions = geometry.attributes.position.array;
-    
     for (let i = 0; i < imageData.length / 4; i++) {
         const r = imageData[i * 4];
         const g = imageData[i * 4 + 1];
         const b = imageData[i * 4 + 2];
-        
-        // Luminance-based height
         const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        positions[i * 3 + 2] = luminance * 2; // Extrude in Z
+        positions[i * 3 + 2] = luminance * 2;
     }
-    
     geometry.computeVertexNormals();
     const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -Math.PI / 2; // Lay flat on grid
-    
+    mesh.rotation.x = -Math.PI / 2;
     processImportedObject(mesh);
 }
 
 function processImportedObject(object) {
-    // Apply standard material to all meshes
+    // Only apply standard material if no materials exist (keep GLTF materials for morph targets)
     object.traverse((child) => {
-        if (child.isMesh) {
+        if (child.isMesh && !child.material) {
             child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
         }
     });

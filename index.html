@@ -27,10 +27,10 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 240px;
+            width: 260px;
             max-height: calc(100vh - 40px);
             overflow-y: auto;
-            padding-right: 5px;
+            padding-right: 10px;
         }
         #ui::-webkit-scrollbar {
             width: 4px;
@@ -79,9 +79,6 @@
             grid-template-columns: 1fr 1fr;
             gap: 5px;
         }
-        canvas {
-            display: block;
-        }
         .label {
             font-size: 11px;
             text-transform: uppercase;
@@ -94,6 +91,25 @@
             color: #9ca3af;
             margin-top: 2px;
             line-height: 1.4;
+        }
+        .trait-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .trait-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-color);
+        }
+        #morph-targets-container {
+            max-height: 300px;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -115,17 +131,21 @@
                 <button class="secondary" onclick="deleteSelected()">Delete</button>
             </div>
         </div>
+        <div id="traits-panel" class="panel" style="display:none">
+            <div class="label">Edit Traits</div>
+            <div id="morph-targets-container"></div>
+            <div class="info">Adjust sliders to modify physical traits via morph targets.</div>
+        </div>
         <div class="panel">
             <div class="label">Import / Convert</div>
             <input type="file" id="importInput" style="display:none" accept=".obj,.stl,.gltf,.glb" onchange="handleImport(event)">
             <button class="secondary" onclick="document.getElementById('importInput').click()">Load 3D File</button>
-            <div class="info">Supports OBJ, STL, GLTF/GLB.</div>
+            <div class="info">Supports OBJ, STL, GLTF/GLB (human models).</div>
         </div>
         <div class="panel">
             <div class="label">Image to 3D (Extrude)</div>
             <input type="file" id="imageInput" style="display:none" accept="image/*" onchange="handleImageImport(event)">
             <button class="secondary" onclick="document.getElementById('imageInput').click()">Load Image</button>
-            <div class="info">Converts image luminance to a 3D height-map model.</div>
         </div>
         <div class="panel">
             <div class="label">Export</div>
