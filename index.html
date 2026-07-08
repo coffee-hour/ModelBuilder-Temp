@@ -49,14 +49,6 @@
             gap: 10px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        input[type="text"], input[type="password"] {
-            background: #1a1a1a;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            color: white;
-            padding: 6px;
-            font-size: 12px;
-        }
         button {
             background: var(--accent-color);
             color: white;
@@ -128,11 +120,6 @@
 <body>
     <div id="ui">
         <div class="panel">
-            <div class="label">API Config</div>
-            <input type="password" id="tripoKey" placeholder="Tripo3D API Key">
-            <div class="info">Enter your key to enable AI generation.</div>
-        </div>
-        <div class="panel">
             <div class="label">Geometry</div>
             <div class="btn-group">
                 <button onclick="addBox()">Box</button>
@@ -160,8 +147,8 @@
             <hr style="border:0; border-top:1px solid #404040; margin: 10px 0;">
             
             <input type="file" id="tripoImageInput" style="display:none" accept="image/*" onchange="handleTripoImage(event)">
-            <button id="tripoBtn" onclick="document.getElementById('tripoImageInput').click()">AI Generate (Tripo3D)</button>
-            <div id="tripoStatus" class="info">Upload image to start AI task.</div>
+            <button id="tripoBtn" onclick="document.getElementById('tripoImageInput').click()">AI Generate (TripoSR)</button>
+            <div id="tripoStatus" class="info">Powered by open-source TripoSR. No API key required.</div>
         </div>
         <div class="panel">
             <div class="label">Simple Extrude</div>

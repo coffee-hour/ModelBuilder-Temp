@@ -12,9 +12,11 @@ const objects = [];
 let selectedObject = null;
 
 // Proxy configuration: Using a simple CORS proxy
-// Note: In a production environment, the user would deploy their own worker.
-// This proxy allows bypass of the browser CORS restriction for the Tripo3D API.
 const PROXY_URL = 'https://corsproxy.io/?';
+
+// TripoSR (Open Source) Integration via Hugging Face Inference or similar public space
+// This implementation targets a public Gradio/TripoSR-style endpoint which is free to use
+const TRIPOSR_API_URL = 'https://stabilityai-triposr.hf.space/--replicas/j6v6l/run/predict';
 
 function init() {
     scene = new THREE.Scene();
@@ -209,68 +211,40 @@ window.handleImport = function(event) {
 
 window.handleTripoImage = async function(event) {
     const file = event.target.files[0];
-    const key = document.getElementById('tripoKey').value;
     const status = document.getElementById('tripoStatus');
     const btn = document.getElementById('tripoBtn');
 
-    if (!file || !key) {
-        alert("Please provide both an image and your Tripo3D API Key.");
-        return;
-    }
+    if (!file) return;
 
-    status.innerText = "Uploading image...";
+    status.innerText = "Processing with TripoSR...";
     btn.disabled = true;
 
     try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Using PROXY_URL to bypass browser CORS restrictions for the Tripo3D API
-        const uploadRes = await fetch(PROXY_URL + encodeURIComponent('https://api.tripo3d.ai/v1/upload'), {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${key}` },
-            body: formData
-        });
-        const uploadData = await uploadRes.json();
-        if (uploadData.code !== 0) throw new Error(uploadData.message);
-        
-        const imageToken = uploadData.data.image_token;
-
-        status.innerText = "Starting AI task...";
-        const taskRes = await fetch(PROXY_URL + encodeURIComponent('https://api.tripo3d.ai/v1/task'), {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${key}`,
-                'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({
-                type: "image_to_model",
-                file: { type: "jpg", file_token: imageToken }
-            })
-        });
-        const taskData = await taskRes.json();
-        if (taskData.code !== 0) throw new Error(taskData.message);
-        
-        const taskId = taskData.data.task_id;
-
-        const pollInterval = setInterval(async () => {
-            status.innerText = "Processing AI model (polling)...";
-            const res = await fetch(PROXY_URL + encodeURIComponent(`https://api.tripo3d.ai/v1/task/${taskId}`), {
-                headers: { 'Authorization': `Bearer ${key}` }
-            });
-            const data = await res.json();
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const base64Image = e.target.result;
             
-            if (data.data.status === 'success') {
-                clearInterval(pollInterval);
+            // Call TripoSR inference endpoint
+            const response = await fetch(TRIPOSR_API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    data: [base64Image]
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.data && result.data[0]) {
                 status.innerText = "Success! Loading model...";
+                const modelUrl = result.data[0].name; // Assuming the output is a path to the GLB
+                loadTripoModel(modelUrl);
                 btn.disabled = false;
-                loadTripoModel(data.data.output.model);
-            } else if (data.data.status === 'failed') {
-                clearInterval(pollInterval);
-                status.innerText = "AI Task failed.";
-                btn.disabled = false;
+            } else {
+                throw new Error("Invalid response from TripoSR");
             }
-        }, 3000);
+        };
+        reader.readAsDataURL(file);
 
     } catch (err) {
         console.error(err);
@@ -281,8 +255,8 @@ window.handleTripoImage = async function(event) {
 
 async function loadTripoModel(url) {
     const loader = new GLTFLoader();
-    // Also use the proxy for model loading to avoid CORS issues on the generated asset URL
-    loader.load(PROXY_URL + encodeURIComponent(url), (gltf) => {
+    // Load from TripoSR output URL
+    loader.load(url, (gltf) => {
         processImportedObject(gltf.scene);
     });
 }
