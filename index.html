@@ -28,6 +28,16 @@
             flex-direction: column;
             gap: 15px;
             width: 220px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        #ui::-webkit-scrollbar {
+            width: 4px;
+        }
+        #ui::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
         }
         .panel {
             background: var(--panel-bg);
@@ -80,9 +90,10 @@
             margin-bottom: 4px;
         }
         .info {
-            font-size: 11px;
+            font-size: 10px;
             color: #9ca3af;
-            margin-top: 5px;
+            margin-top: 2px;
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -103,13 +114,17 @@
                 <button id="btn-scale" onclick="setTransformMode('scale')">Scale</button>
                 <button class="secondary" onclick="deleteSelected()">Delete</button>
             </div>
-            <div class="info">Click object to select</div>
         </div>
         <div class="panel">
-            <div class="label">File</div>
-            <button class="secondary" onclick="exportModel()">Export OBJ</button>
-            <input type="file" id="fileInput" style="display:none" accept=".obj" onchange="importModel(event)">
-            <button class="secondary" onclick="document.getElementById('fileInput').click()">Import OBJ</button>
+            <div class="label">Import / Convert</div>
+            <input type="file" id="importInput" style="display:none" accept=".obj,.stl,.gltf,.glb" onchange="handleImport(event)">
+            <button class="secondary" onclick="document.getElementById('importInput').click()">Load File</button>
+            <div class="info">Supports .OBJ, .STL, .GLTF, .GLB. Loaded files can be edited and exported.</div>
+        </div>
+        <div class="panel">
+            <div class="label">Export</div>
+            <button onclick="exportModel()">Download as OBJ</button>
+            <div class="info">Exports all visible geometry.</div>
         </div>
     </div>
     <script type="importmap">

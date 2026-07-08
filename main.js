@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let scene, camera, renderer, controls, transformControls;
 let raycaster, mouse;
@@ -139,59 +141,76 @@ window.exportModel = function() {
     link.click();
 };
 
-window.importModel = function(event) {
+window.handleImport = function(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
+    const extension = file.name.split('.').pop().toLowerCase();
     const reader = new FileReader();
+
     reader.onload = function(e) {
-        const loader = new OBJLoader();
-        try {
-            const object = loader.parse(e.target.result);
-            console.log("OBJ Parsed. Raw object:", object);
-
-            // Ensure meshes are visible
-            object.traverse((child) => {
-                if (child.isMesh) {
-                    child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
-                }
-            });
-
-            // Compute bounding box for normalization
-            const box = new THREE.Box3().setFromObject(object);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            const center = new THREE.Vector3();
-            box.getCenter(center);
-
-            console.log("Model Bounding Box Size:", size);
-            console.log("Model Bounding Box Center:", center);
-
-            // Normalize size and position
-            const maxDim = Math.max(size.x, size.y, size.z);
-            if (maxDim > 0) {
-                const scale = 2 / maxDim;
-                object.scale.set(scale, scale, scale);
-                console.log("Auto-scaling model by factor:", scale);
-            }
-
-            // Center the model
-            object.position.x -= center.x * object.scale.x;
-            object.position.y -= (center.y - size.y / 2) * object.scale.y; // Sit on grid
-            object.position.z -= center.z * object.scale.z;
-
-            scene.add(object);
-            objects.push(object);
-            selectObject(object);
-            
-            console.log("Model successfully added to scene.");
-        } catch (err) {
-            console.error("Error parsing OBJ:", err);
-            alert("Failed to parse OBJ file. Check console for details.");
+        const contents = e.target.result;
+        
+        if (extension === 'obj') {
+            const loader = new OBJLoader();
+            processImportedObject(loader.parse(contents));
+        } 
+        else if (extension === 'stl') {
+            const loader = new STLLoader();
+            const geometry = loader.parse(contents);
+            const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+            const mesh = new THREE.Mesh(geometry, material);
+            processImportedObject(mesh);
+        }
+        else if (extension === 'gltf' || extension === 'glb') {
+            const loader = new GLTFLoader();
+            loader.parse(contents, '', (gltf) => {
+                processImportedObject(gltf.scene);
+            }, (err) => console.error(err));
         }
     };
-    reader.readAsText(file);
+
+    if (extension === 'glb') {
+        reader.readAsArrayBuffer(file);
+    } else {
+        reader.readAsText(file);
+    }
+    
     event.target.value = '';
 };
+
+function processImportedObject(object) {
+    console.log("Processing object:", object);
+
+    // Apply standard material to all meshes
+    object.traverse((child) => {
+        if (child.isMesh) {
+            child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+        }
+    });
+
+    // Compute bounding box for normalization
+    const box = new THREE.Box3().setFromObject(object);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    // Normalize size
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) {
+        const scale = 2 / maxDim;
+        object.scale.set(scale, scale, scale);
+    }
+
+    // Center and align to grid
+    object.position.x -= center.x * object.scale.x;
+    object.position.y -= (center.y - size.y / 2) * object.scale.y;
+    object.position.z -= center.z * object.scale.z;
+
+    scene.add(object);
+    objects.push(object);
+    selectObject(object);
+}
 
 init();
