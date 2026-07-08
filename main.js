@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -13,8 +14,6 @@ let selectedObject = null;
 let selectedBone = null;
 let skeletonMode = false;
 
-// Proxy configuration: Using a simple CORS proxy
-const PROXY_URL = 'https://corsproxy.io/?';
 const TRIPOSR_API_URL = 'https://stabilityai-triposr.hf.space/--replicas/j6v6l/run/predict';
 
 function init() {
@@ -65,7 +64,7 @@ function onWindowResize() {
 }
 
 function onMouseDown(event) {
-    if (event.target.closest('#ui')) return;
+    if (event.target && typeof event.target.closest === 'function' && event.target.closest('#ui')) return;
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -75,20 +74,11 @@ function onMouseDown(event) {
 
     if (intersects.length > 0) {
         let obj = intersects[0].object;
-        
-        // In skeleton mode, we prioritize bone picking if we hit a skinned mesh
-        if (skeletonMode) {
-             while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
-                obj = obj.parent;
-            }
-            selectObject(obj);
-        } else {
-            while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
-                obj = obj.parent;
-            }
-            selectObject(obj);
+        while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
+            obj = obj.parent;
         }
-    } else if (!transformControls.dragging) {
+        selectObject(obj);
+    } else if (transformControls && !transformControls.dragging) {
         selectObject(null);
     }
 }
@@ -116,28 +106,30 @@ function selectObject(obj) {
         });
 
         if (morphTargets.length > 0 && !skeletonMode) {
-            traitsPanel.style.display = 'block';
-            morphContainer.innerHTML = '';
-            const uniqueTargets = [...new Set(morphTargets.map(t => t.name))];
-            uniqueTargets.forEach(targetName => {
-                const row = document.createElement('div');
-                row.className = 'trait-row';
-                const firstMesh = morphTargets.find(t => t.name === targetName).mesh;
-                const idx = firstMesh.morphTargetDictionary[targetName];
-                row.innerHTML = `<div class="trait-header"><span>${targetName}</span><span id="val-${targetName}">${firstMesh.morphTargetInfluences[idx].toFixed(2)}</span></div>
-                                 <input type="range" min="0" max="1" step="0.01" value="${firstMesh.morphTargetInfluences[idx]}">`;
-                const slider = row.querySelector('input');
-                slider.oninput = (e) => {
-                    const val = parseFloat(e.target.value);
-                    row.querySelector(`#val-${targetName}`).innerText = val.toFixed(2);
-                    morphTargets.filter(t => t.name === targetName).forEach(t => {
-                        t.mesh.morphTargetInfluences[t.mesh.morphTargetDictionary[targetName]] = val;
-                    });
-                };
-                morphContainer.appendChild(row);
-            });
+            if (traitsPanel) traitsPanel.style.display = 'block';
+            if (morphContainer) {
+                morphContainer.innerHTML = '';
+                const uniqueTargets = [...new Set(morphTargets.map(t => t.name))];
+                uniqueTargets.forEach(targetName => {
+                    const row = document.createElement('div');
+                    row.className = 'trait-row';
+                    const firstMesh = morphTargets.find(t => t.name === targetName).mesh;
+                    const idx = firstMesh.morphTargetDictionary[targetName];
+                    row.innerHTML = `<div class="trait-header"><span>${targetName}</span><span id="val-${targetName}">${firstMesh.morphTargetInfluences[idx].toFixed(2)}</span></div>
+                                     <input type="range" min="0" max="1" step="0.01" value="${firstMesh.morphTargetInfluences[idx]}">`;
+                    const slider = row.querySelector('input');
+                    slider.oninput = (e) => {
+                        const val = parseFloat(e.target.value);
+                        row.querySelector(`#val-${targetName}`).innerText = val.toFixed(2);
+                        morphTargets.filter(t => t.name === targetName).forEach(t => {
+                            t.mesh.morphTargetInfluences[t.mesh.morphTargetDictionary[targetName]] = val;
+                        });
+                    };
+                    morphContainer.appendChild(row);
+                });
+            }
         } else {
-            traitsPanel.style.display = 'none';
+            if (traitsPanel) traitsPanel.style.display = 'none';
         }
 
         // Skeleton Mode Handling
@@ -148,30 +140,32 @@ function selectObject(obj) {
             });
 
             if (bones.length > 0) {
-                skeletonPanel.style.display = 'block';
-                skeletonContainer.innerHTML = '';
-                bones.forEach(bone => {
-                    const item = document.createElement('div');
-                    item.className = 'bone-item';
-                    item.innerText = bone.name || `Bone ${bones.indexOf(bone)}`;
-                    item.onclick = (e) => {
-                        e.stopPropagation();
-                        document.querySelectorAll('.bone-item').forEach(i => i.classList.remove('selected'));
-                        item.classList.add('selected');
-                        selectBone(bone);
-                    };
-                    skeletonContainer.appendChild(item);
-                });
+                if (skeletonPanel) skeletonPanel.style.display = 'block';
+                if (skeletonContainer) {
+                    skeletonContainer.innerHTML = '';
+                    bones.forEach(bone => {
+                        const item = document.createElement('div');
+                        item.className = 'bone-item';
+                        item.innerText = bone.name || `Bone ${bones.indexOf(bone)}`;
+                        item.onclick = (e) => {
+                            e.stopPropagation();
+                            document.querySelectorAll('.bone-item').forEach(i => i.classList.remove('selected'));
+                            item.classList.add('selected');
+                            selectBone(bone);
+                        };
+                        skeletonContainer.appendChild(item);
+                    });
+                }
             } else {
-                skeletonPanel.style.display = 'none';
+                if (skeletonPanel) skeletonPanel.style.display = 'none';
             }
         } else {
-            skeletonPanel.style.display = 'none';
+            if (skeletonPanel) skeletonPanel.style.display = 'none';
         }
     } else {
         transformControls.detach();
-        traitsPanel.style.display = 'none';
-        skeletonPanel.style.display = 'none';
+        if (traitsPanel) traitsPanel.style.display = 'none';
+        if (skeletonPanel) skeletonPanel.style.display = 'none';
     }
 }
 
@@ -191,17 +185,16 @@ window.toggleSkeletonMode = function() {
         btn.innerText = "Skeleton Mode: OFF";
         btn.classList.remove('toggle-active');
         btn.classList.add('secondary');
-        if (selectedBone) transformControls.attach(selectedObject);
+        if (selectedBone && selectedObject) transformControls.attach(selectedObject);
         selectedBone = null;
     }
-    // Refresh panels
     if (selectedObject) selectObject(selectedObject);
 };
 
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
+    if (controls) controls.update();
+    if (renderer) renderer.render(scene, camera);
 }
 
 window.addBox = function() {
@@ -250,6 +243,19 @@ window.exportModel = function() {
     link.href = URL.createObjectURL(blob);
     link.download = 'model.obj';
     link.click();
+};
+
+window.exportGLB = function() {
+    const exportGroup = new THREE.Group();
+    objects.forEach(obj => exportGroup.add(obj.clone()));
+    const exporter = new GLTFExporter();
+    exporter.parse(exportGroup, (gltf) => {
+        const blob = new Blob([JSON.stringify(gltf)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'model.glb';
+        link.click();
+    }, (err) => console.error(err), { binary: true });
 };
 
 window.handleImport = function(event) {
