@@ -1,19 +1,22 @@
 /**
- * GOOGLE APPS SCRIPT BACKEND (Username-based)
- * Paste this into your Google Apps Script project (script.google.com)
+ * GOOGLE APPS SCRIPT BACKEND (Multiplayer Edition)
  */
 
 const SHEET_NAME = 'Players';
+const EVENTS_SHEET = 'Events';
 
 function doPost(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
+  let eventSheet = ss.getSheetByName(EVENTS_SHEET);
   
-  // Initialize sheet if it doesn't exist
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
     sheet.appendRow(['Username', 'Resolve', 'Reputation', 'Inventory', 'LastSeen']);
-    sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#efefef');
+  }
+  if (!eventSheet) {
+    eventSheet = ss.insertSheet(EVENTS_SHEET);
+    eventSheet.appendRow(['Timestamp', 'Username', 'Text', 'Type']);
   }
 
   try {
@@ -21,77 +24,67 @@ function doPost(e) {
     const action = data.action;
     const username = data.username;
 
-    if (!username) {
-      throw new Error("Username is required");
-    }
-
     if (action === 'get_player') {
-      const player = getPlayer(sheet, username);
-      return ContentService.createTextOutput(JSON.stringify(player))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify(getPlayer(sheet, username))).setMimeType(ContentService.MimeType.JSON);
     }
-
     if (action === 'save_player') {
       savePlayer(sheet, username, data.stats);
-      return ContentService.createTextOutput(JSON.stringify({ success: true }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'log_event') {
+      eventSheet.appendRow([Date.now(), username, data.text, data.type]);
+      return ContentService.createTextOutput(JSON.stringify({ success: true })).setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'poll') {
+      const events = getEvents(eventSheet, data.lastTimestamp);
+      return ContentService.createTextOutput(JSON.stringify({ events })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ error: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ error: error.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
+function getEvents(sheet, lastTimestamp) {
+  const rows = sheet.getDataRange().getValues();
+  const events = [];
+  // Read backwards from newest to find events since lastTimestamp
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const timestamp = rows[i][0];
+    if (timestamp > lastTimestamp) {
+      events.unshift({
+        timestamp: timestamp,
+        username: rows[i][1],
+        text: rows[i][2],
+        type: rows[i][3]
+      });
+    } else {
+      break; // Optimization: stop once we hit old events
+    }
+  }
+  return events;
+}
+
 function getPlayer(sheet, username) {
-  const range = sheet.getDataRange();
-  const rows = range.getValues();
-  
-  // Search for existing username (case-insensitive check)
+  const rows = sheet.getDataRange().getValues();
   const lowerUsername = username.toLowerCase();
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0].toString().toLowerCase() === lowerUsername) {
-      return {
-        resolve: rows[i][1],
-        reputation: rows[i][2],
-        inventory: JSON.parse(rows[i][3] || '[]')
-      };
+      return { resolve: rows[i][1], reputation: rows[i][2], inventory: JSON.parse(rows[i][3] || '[]') };
     }
   }
-  
-  // Create default new player if username not found
   const defaultPlayer = { resolve: 100, reputation: 0, inventory: [] };
-  sheet.appendRow([
-    username, 
-    defaultPlayer.resolve, 
-    defaultPlayer.reputation, 
-    JSON.stringify(defaultPlayer.inventory), 
-    new Date()
-  ]);
+  sheet.appendRow([username, defaultPlayer.resolve, defaultPlayer.reputation, JSON.stringify(defaultPlayer.inventory), new Date()]);
   return defaultPlayer;
 }
 
 function savePlayer(sheet, username, stats) {
-  const range = sheet.getDataRange();
-  const rows = range.getValues();
+  const rows = sheet.getDataRange().getValues();
   const lowerUsername = username.toLowerCase();
-  
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0].toString().toLowerCase() === lowerUsername) {
-      // Columns: 2=Resolve, 3=Reputation, 4=Inventory, 5=LastSeen
-      sheet.getRange(i + 1, 2).setValue(stats.resolve);
-      sheet.getRange(i + 1, 3).setValue(stats.reputation);
-      sheet.getRange(i + 1, 4).setValue(JSON.stringify(stats.inventory));
+      sheet.getRange(i + 1, 2, 1, 3).setValues([[stats.resolve, stats.reputation, JSON.stringify(stats.inventory)]]);
       sheet.getRange(i + 1, 5).setValue(new Date());
       return;
     }
   }
-  
-  // Fallback: If for some reason the row was lost, recreate it
-  sheet.appendRow([
-    username, 
-    stats.resolve, 
-    stats.reputation, 
-    JSON.stringify(stats.inventory), 
-    new Date()
-  ]);
 }
