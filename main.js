@@ -170,7 +170,7 @@ window.handleImport = function(event) {
         }
     };
 
-    if (extension === 'glb') {
+    if (extension === 'glb' || extension === 'stl') {
         reader.readAsArrayBuffer(file);
     } else {
         reader.readAsText(file);
@@ -179,9 +179,57 @@ window.handleImport = function(event) {
     event.target.value = '';
 };
 
-function processImportedObject(object) {
-    console.log("Processing object:", object);
+window.handleImageImport = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            create3DFromImage(img);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+};
+
+function create3DFromImage(img) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Resize for performance
+    const width = 128;
+    const height = Math.round((img.height / img.width) * width);
+    canvas.width = width;
+    canvas.height = height;
+    
+    ctx.drawImage(img, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height).data;
+    
+    const geometry = new THREE.PlaneGeometry(width / 10, height / 10, width - 1, height - 1);
+    const positions = geometry.attributes.position.array;
+    
+    for (let i = 0; i < imageData.length / 4; i++) {
+        const r = imageData[i * 4];
+        const g = imageData[i * 4 + 1];
+        const b = imageData[i * 4 + 2];
+        
+        // Luminance-based height
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        positions[i * 3 + 2] = luminance * 2; // Extrude in Z
+    }
+    
+    geometry.computeVertexNormals();
+    const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2; // Lay flat on grid
+    
+    processImportedObject(mesh);
+}
+
+function processImportedObject(object) {
     // Apply standard material to all meshes
     object.traverse((child) => {
         if (child.isMesh) {
@@ -189,21 +237,18 @@ function processImportedObject(object) {
         }
     });
 
-    // Compute bounding box for normalization
     const box = new THREE.Box3().setFromObject(object);
     const size = new THREE.Vector3();
     box.getSize(size);
     const center = new THREE.Vector3();
     box.getCenter(center);
 
-    // Normalize size
     const maxDim = Math.max(size.x, size.y, size.z);
     if (maxDim > 0) {
         const scale = 2 / maxDim;
         object.scale.set(scale, scale, scale);
     }
 
-    // Center and align to grid
     object.position.x -= center.x * object.scale.x;
     object.position.y -= (center.y - size.y / 2) * object.scale.y;
     object.position.z -= center.z * object.scale.z;

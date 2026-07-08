@@ -27,7 +27,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 220px;
+            width: 240px;
             max-height: calc(100vh - 40px);
             overflow-y: auto;
             padding-right: 5px;
@@ -118,13 +118,18 @@
         <div class="panel">
             <div class="label">Import / Convert</div>
             <input type="file" id="importInput" style="display:none" accept=".obj,.stl,.gltf,.glb" onchange="handleImport(event)">
-            <button class="secondary" onclick="document.getElementById('importInput').click()">Load File</button>
-            <div class="info">Supports .OBJ, .STL, .GLTF, .GLB. Loaded files can be edited and exported.</div>
+            <button class="secondary" onclick="document.getElementById('importInput').click()">Load 3D File</button>
+            <div class="info">Supports OBJ, STL, GLTF/GLB.</div>
+        </div>
+        <div class="panel">
+            <div class="label">Image to 3D (Extrude)</div>
+            <input type="file" id="imageInput" style="display:none" accept="image/*" onchange="handleImageImport(event)">
+            <button class="secondary" onclick="document.getElementById('imageInput').click()">Load Image</button>
+            <div class="info">Converts image luminance to a 3D height-map model.</div>
         </div>
         <div class="panel">
             <div class="label">Export</div>
             <button onclick="exportModel()">Download as OBJ</button>
-            <div class="info">Exports all visible geometry.</div>
         </div>
     </div>
     <script type="importmap">
