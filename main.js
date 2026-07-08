@@ -8,27 +8,27 @@ const objects = [];
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d0d);
+    scene.background = new THREE.Color(0x1a1a1a);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
 
-    renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio / 4); // Pixelated effect
+    renderer.setPixelRatio(window.devicePixelRatio); 
     document.body.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    const ambientLight = new THREE.AmbientLight(0xff4500, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const pointLight = new THREE.PointLight(0xff4500, 1);
-    pointLight.position.set(10, 10, 10);
-    scene.add(pointLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
 
-    const grid = new THREE.GridHelper(10, 10, 0xff4500, 0x333333);
+    const grid = new THREE.GridHelper(10, 20, 0x404040, 0x2d2d2d);
     scene.add(grid);
 
     window.addEventListener('resize', onWindowResize);
@@ -49,7 +49,7 @@ function animate() {
 
 window.addBox = function() {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0xff4500, wireframe: false });
+    const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.y = 0.5;
     scene.add(mesh);
@@ -57,8 +57,8 @@ window.addBox = function() {
 };
 
 window.addSphere = function() {
-    const geometry = new THREE.SphereGeometry(0.5, 16, 16);
-    const material = new THREE.MeshStandardMaterial({ color: 0xff4500, wireframe: false });
+    const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+    const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.y = 0.5;
     scene.add(mesh);
@@ -84,7 +84,7 @@ window.importModel = function(event) {
         const object = loader.parse(e.target.result);
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = new THREE.MeshStandardMaterial({ color: 0xff4500 });
+                child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
             }
         });
         scene.add(object);
