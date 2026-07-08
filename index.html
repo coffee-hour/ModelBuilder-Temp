@@ -3,198 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ModelBuilder | coffee-hour</title>
+    <title>MUD Engine | Persistence</title>
     <style>
-        :root {
-            --bg-color: #1a1a1a;
-            --panel-bg: #2d2d2d;
-            --accent-color: #3b82f6;
-            --text-color: #f3f4f6;
-            --border-color: #404040;
-        }
         body {
+            background-color: #0c0c0c;
+            color: #00ff41;
+            font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            overflow: hidden;
-            background-color: var(--bg-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            color: var(--text-color);
-        }
-        #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            width: 260px;
-            max-height: calc(100vh - 40px);
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        #terminal {
+            flex-grow: 1;
             overflow-y: auto;
-            padding-right: 10px;
+            border: 1px solid #333;
+            padding: 10px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
         }
-        #ui::-webkit-scrollbar {
-            width: 4px;
-        }
-        #ui::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-        .panel {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
+        #input-area {
             display: flex;
-            flex-direction: column;
             gap: 10px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        button {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px 12px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: background 0.2s;
-            text-align: center;
-        }
-        button:hover {
-            background: #2563eb;
-        }
-        button:disabled {
-            background: #404040;
-            cursor: not-allowed;
-        }
-        button.secondary {
-            background: #404040;
-        }
-        button.secondary:hover {
-            background: #525252;
-        }
-        button.active {
-            background: #1d4ed8;
-            outline: 2px solid white;
-        }
-        button.toggle-active {
-            background: #059669;
-        }
-        .btn-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5px;
-        }
-        .label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #9ca3af;
-            margin-bottom: 4px;
-        }
-        .info {
-            font-size: 10px;
-            color: #9ca3af;
-            margin-top: 2px;
-            line-height: 1.4;
-        }
-        .trait-row {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            margin-bottom: 8px;
-        }
-        .trait-header {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-        }
-        input[type="range"] {
-            width: 100%;
-            accent-color: var(--accent-color);
-        }
-        #morph-targets-container, #skeleton-container {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .bone-item {
-            font-size: 11px;
-            padding: 4px 8px;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-bottom: 2px;
+        input {
             background: #1a1a1a;
+            border: 1px solid #333;
+            color: #00ff41;
+            padding: 10px;
+            flex-grow: 1;
+            font-family: inherit;
         }
-        .bone-item:hover {
-            background: #404040;
+        #stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 10px;
         }
-        .bone-item.selected {
-            background: var(--accent-color);
-            color: white;
-        }
+        .system { color: #555; }
+        .error { color: #ff4141; }
+        .item { color: #ffb86c; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div class="panel">
-            <div class="label">Modes</div>
-            <button id="btn-skeleton-mode" class="secondary" onclick="toggleSkeletonMode()">Skeleton Mode: OFF</button>
-        </div>
-        <div class="panel">
-            <div class="label">Geometry</div>
-            <div class="btn-group">
-                <button onclick="addBox()">Box</button>
-                <button onclick="addSphere()">Sphere</button>
-            </div>
-        </div>
-        <div class="panel">
-            <div class="label">Transform Mode</div>
-            <div class="btn-group">
-                <button id="btn-translate" class="active" onclick="setTransformMode('translate')">Move</button>
-                <button id="btn-rotate" onclick="setTransformMode('rotate')">Rotate</button>
-                <button id="btn-scale" onclick="setTransformMode('scale')">Scale</button>
-                <button class="secondary" onclick="deleteSelected()">Delete</button>
-            </div>
-        </div>
-        <div id="skeleton-panel" class="panel" style="display:none">
-            <div class="label">Bones</div>
-            <div id="skeleton-container"></div>
-        </div>
-        <div id="traits-panel" class="panel" style="display:none">
-            <div class="label">Edit Traits</div>
-            <div id="morph-targets-container"></div>
-        </div>
-        <div class="panel">
-            <div class="label">Import / AI Generation</div>
-            <input type="file" id="importInput" style="display:none" accept=".obj,.stl,.gltf,.glb" onchange="handleImport(event)">
-            <button class="secondary" onclick="document.getElementById('importInput').click()">Load 3D File</button>
-            
-            <hr style="border:0; border-top:1px solid #404040; margin: 10px 0;">
-            
-            <input type="file" id="tripoImageInput" style="display:none" accept="image/*" onchange="handleTripoImage(event)">
-            <button id="tripoBtn" onclick="document.getElementById('tripoImageInput').click()">AI Generate (TripoSR)</button>
-        </div>
-        <div class="panel">
-            <div class="label">Simple Extrude</div>
-            <input type="file" id="imageInput" style="display:none" accept="image/*" onchange="handleImageImport(event)">
-            <button class="secondary" onclick="document.getElementById('imageInput').click()">Height Map Extrude</button>
-        </div>
-        <div class="panel">
-            <div class="label">Export</div>
-            <button onclick="exportModel()">Download as OBJ</button>
-            <button class="secondary" onclick="exportGLB()">Force Export (GLB)</button>
-            <div class="info">Force Export saves the scene directly as a .glb file.</div>
-        </div>
+    <div id="stats">
+        ID: <span id="stat-id">None</span> | 
+        Resolve: <span id="stat-resolve">0</span> | 
+        Reputation: <span id="stat-reputation">0</span>
     </div>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
-    <script type="module" src="main.js"></script>
+    <div id="terminal">Welcome to the MUD. Enter your Player ID to begin...</div>
+    <div id="input-area">
+        <span>></span>
+        <input type="text" id="cmd" autofocus>
+    </div>
+
+    <script src="main.js"></script>
 </body>
 </html>
