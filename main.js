@@ -21,11 +21,9 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
-    // Orbit Controls
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    // Transform Controls
     transformControls = new TransformControls(camera, renderer.domElement);
     transformControls.addEventListener('change', () => renderer.render(scene, camera));
     transformControls.addEventListener('dragging-changed', (event) => {
@@ -33,7 +31,6 @@ function init() {
     });
     scene.add(transformControls);
 
-    // Raycaster for selection
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
 
@@ -60,7 +57,6 @@ function onWindowResize() {
 }
 
 function onMouseDown(event) {
-    // Ignore UI clicks
     if (event.target.closest('#ui')) return;
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -71,7 +67,6 @@ function onMouseDown(event) {
 
     if (intersects.length > 0) {
         let obj = intersects[0].object;
-        // Find top level object in our group
         while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
             obj = obj.parent;
         }
@@ -133,10 +128,8 @@ window.deleteSelected = function() {
 };
 
 window.exportModel = function() {
-    // Export only the user-created objects
     const exportGroup = new THREE.Group();
     objects.forEach(obj => exportGroup.add(obj.clone()));
-    
     const exporter = new OBJExporter();
     const result = exporter.parse(exportGroup);
     const blob = new Blob([result], { type: 'text/plain' });
@@ -155,21 +148,49 @@ window.importModel = function(event) {
         const loader = new OBJLoader();
         try {
             const object = loader.parse(e.target.result);
+            console.log("OBJ Parsed. Raw object:", object);
+
+            // Ensure meshes are visible
             object.traverse((child) => {
                 if (child.isMesh) {
                     child.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
                 }
             });
+
+            // Compute bounding box for normalization
+            const box = new THREE.Box3().setFromObject(object);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            console.log("Model Bounding Box Size:", size);
+            console.log("Model Bounding Box Center:", center);
+
+            // Normalize size and position
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) {
+                const scale = 2 / maxDim;
+                object.scale.set(scale, scale, scale);
+                console.log("Auto-scaling model by factor:", scale);
+            }
+
+            // Center the model
+            object.position.x -= center.x * object.scale.x;
+            object.position.y -= (center.y - size.y / 2) * object.scale.y; // Sit on grid
+            object.position.z -= center.z * object.scale.z;
+
             scene.add(object);
             objects.push(object);
             selectObject(object);
+            
+            console.log("Model successfully added to scene.");
         } catch (err) {
             console.error("Error parsing OBJ:", err);
-            alert("Failed to parse OBJ file.");
+            alert("Failed to parse OBJ file. Check console for details.");
         }
     };
     reader.readAsText(file);
-    // Clear input
     event.target.value = '';
 };
 
