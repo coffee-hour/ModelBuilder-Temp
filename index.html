@@ -78,6 +78,9 @@
             background: #1d4ed8;
             outline: 2px solid white;
         }
+        button.toggle-active {
+            background: #059669;
+        }
         .btn-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -111,14 +114,33 @@
             width: 100%;
             accent-color: var(--accent-color);
         }
-        #morph-targets-container {
+        #morph-targets-container, #skeleton-container {
             max-height: 200px;
             overflow-y: auto;
+        }
+        .bone-item {
+            font-size: 11px;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            background: #1a1a1a;
+        }
+        .bone-item:hover {
+            background: #404040;
+        }
+        .bone-item.selected {
+            background: var(--accent-color);
+            color: white;
         }
     </style>
 </head>
 <body>
     <div id="ui">
+        <div class="panel">
+            <div class="label">Modes</div>
+            <button id="btn-skeleton-mode" class="secondary" onclick="toggleSkeletonMode()">Skeleton Mode: OFF</button>
+        </div>
         <div class="panel">
             <div class="label">Geometry</div>
             <div class="btn-group">
@@ -135,6 +157,10 @@
                 <button class="secondary" onclick="deleteSelected()">Delete</button>
             </div>
         </div>
+        <div id="skeleton-panel" class="panel" style="display:none">
+            <div class="label">Bones</div>
+            <div id="skeleton-container"></div>
+        </div>
         <div id="traits-panel" class="panel" style="display:none">
             <div class="label">Edit Traits</div>
             <div id="morph-targets-container"></div>
@@ -148,7 +174,6 @@
             
             <input type="file" id="tripoImageInput" style="display:none" accept="image/*" onchange="handleTripoImage(event)">
             <button id="tripoBtn" onclick="document.getElementById('tripoImageInput').click()">AI Generate (TripoSR)</button>
-            <div id="tripoStatus" class="info">Powered by open-source TripoSR. No API key required.</div>
         </div>
         <div class="panel">
             <div class="label">Simple Extrude</div>

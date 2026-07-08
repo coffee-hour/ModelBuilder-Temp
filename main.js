@@ -10,12 +10,11 @@ let scene, camera, renderer, controls, transformControls;
 let raycaster, mouse;
 const objects = [];
 let selectedObject = null;
+let selectedBone = null;
+let skeletonMode = false;
 
 // Proxy configuration: Using a simple CORS proxy
 const PROXY_URL = 'https://corsproxy.io/?';
-
-// TripoSR (Open Source) Integration via Hugging Face Inference or similar public space
-// This implementation targets a public Gradio/TripoSR-style endpoint which is free to use
 const TRIPOSR_API_URL = 'https://stabilityai-triposr.hf.space/--replicas/j6v6l/run/predict';
 
 function init() {
@@ -76,10 +75,19 @@ function onMouseDown(event) {
 
     if (intersects.length > 0) {
         let obj = intersects[0].object;
-        while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
-            obj = obj.parent;
+        
+        // In skeleton mode, we prioritize bone picking if we hit a skinned mesh
+        if (skeletonMode) {
+             while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
+                obj = obj.parent;
+            }
+            selectObject(obj);
+        } else {
+            while(obj.parent && obj.parent !== scene && obj.parent.type !== 'Scene') {
+                obj = obj.parent;
+            }
+            selectObject(obj);
         }
-        selectObject(obj);
     } else if (!transformControls.dragging) {
         selectObject(null);
     }
@@ -87,11 +95,16 @@ function onMouseDown(event) {
 
 function selectObject(obj) {
     selectedObject = obj;
+    selectedBone = null;
     const traitsPanel = document.getElementById('traits-panel');
     const morphContainer = document.getElementById('morph-targets-container');
+    const skeletonPanel = document.getElementById('skeleton-panel');
+    const skeletonContainer = document.getElementById('skeleton-container');
     
     if (obj) {
         transformControls.attach(obj);
+        
+        // Morph Targets
         const morphTargets = [];
         obj.traverse((child) => {
             if (child.isMesh && child.morphTargetInfluences) {
@@ -102,7 +115,7 @@ function selectObject(obj) {
             }
         });
 
-        if (morphTargets.length > 0) {
+        if (morphTargets.length > 0 && !skeletonMode) {
             traitsPanel.style.display = 'block';
             morphContainer.innerHTML = '';
             const uniqueTargets = [...new Set(morphTargets.map(t => t.name))];
@@ -126,11 +139,64 @@ function selectObject(obj) {
         } else {
             traitsPanel.style.display = 'none';
         }
+
+        // Skeleton Mode Handling
+        if (skeletonMode) {
+            const bones = [];
+            obj.traverse((child) => {
+                if (child.isBone) bones.push(child);
+            });
+
+            if (bones.length > 0) {
+                skeletonPanel.style.display = 'block';
+                skeletonContainer.innerHTML = '';
+                bones.forEach(bone => {
+                    const item = document.createElement('div');
+                    item.className = 'bone-item';
+                    item.innerText = bone.name || `Bone ${bones.indexOf(bone)}`;
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        document.querySelectorAll('.bone-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        selectBone(bone);
+                    };
+                    skeletonContainer.appendChild(item);
+                });
+            } else {
+                skeletonPanel.style.display = 'none';
+            }
+        } else {
+            skeletonPanel.style.display = 'none';
+        }
     } else {
         transformControls.detach();
         traitsPanel.style.display = 'none';
+        skeletonPanel.style.display = 'none';
     }
 }
+
+function selectBone(bone) {
+    selectedBone = bone;
+    transformControls.attach(bone);
+}
+
+window.toggleSkeletonMode = function() {
+    skeletonMode = !skeletonMode;
+    const btn = document.getElementById('btn-skeleton-mode');
+    if (skeletonMode) {
+        btn.innerText = "Skeleton Mode: ON";
+        btn.classList.add('toggle-active');
+        btn.classList.remove('secondary');
+    } else {
+        btn.innerText = "Skeleton Mode: OFF";
+        btn.classList.remove('toggle-active');
+        btn.classList.add('secondary');
+        if (selectedBone) transformControls.attach(selectedObject);
+        selectedBone = null;
+    }
+    // Refresh panels
+    if (selectedObject) selectObject(selectedObject);
+};
 
 function animate() {
     requestAnimationFrame(animate);
@@ -213,39 +279,28 @@ window.handleTripoImage = async function(event) {
     const file = event.target.files[0];
     const status = document.getElementById('tripoStatus');
     const btn = document.getElementById('tripoBtn');
-
     if (!file) return;
-
     status.innerText = "Processing with TripoSR...";
     btn.disabled = true;
-
     try {
         const reader = new FileReader();
         reader.onload = async function(e) {
             const base64Image = e.target.result;
-            
-            // Call TripoSR inference endpoint
             const response = await fetch(TRIPOSR_API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    data: [base64Image]
-                })
+                body: JSON.stringify({ data: [base64Image] })
             });
-
             const result = await response.json();
-            
             if (result.data && result.data[0]) {
                 status.innerText = "Success! Loading model...";
-                const modelUrl = result.data[0].name; // Assuming the output is a path to the GLB
-                loadTripoModel(modelUrl);
+                loadTripoModel(result.data[0].name);
                 btn.disabled = false;
             } else {
                 throw new Error("Invalid response from TripoSR");
             }
         };
         reader.readAsDataURL(file);
-
     } catch (err) {
         console.error(err);
         status.innerText = "Error: " + err.message;
@@ -255,7 +310,6 @@ window.handleTripoImage = async function(event) {
 
 async function loadTripoModel(url) {
     const loader = new GLTFLoader();
-    // Load from TripoSR output URL
     loader.load(url, (gltf) => {
         processImportedObject(gltf.scene);
     });
