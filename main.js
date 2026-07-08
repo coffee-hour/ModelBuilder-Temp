@@ -3,7 +3,7 @@
  */
 
 // REPLACE THIS with your deployed Google Apps Script Web App URL
-const GAS_ENDPOINT = 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyb6ICpsENWN3w1p2M3xb7n9mJfHWStPAxUGCPUzJ6JFI2HYOGJDPpYCF0sHwvYZCQt8g/exec';
 
 let player = {
     id: null,
