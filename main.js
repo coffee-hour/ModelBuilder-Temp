@@ -11,6 +11,11 @@ let raycaster, mouse;
 const objects = [];
 let selectedObject = null;
 
+// Proxy configuration: Using a simple CORS proxy
+// Note: In a production environment, the user would deploy their own worker.
+// This proxy allows bypass of the browser CORS restriction for the Tripo3D API.
+const PROXY_URL = 'https://corsproxy.io/?';
+
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a1a);
@@ -217,11 +222,11 @@ window.handleTripoImage = async function(event) {
     btn.disabled = true;
 
     try {
-        // Step 1: Upload to Tripo (simulated with FormData for actual API usage)
         const formData = new FormData();
         formData.append('file', file);
         
-        const uploadRes = await fetch('https://api.tripo3d.ai/v1/upload', {
+        // Using PROXY_URL to bypass browser CORS restrictions for the Tripo3D API
+        const uploadRes = await fetch(PROXY_URL + encodeURIComponent('https://api.tripo3d.ai/v1/upload'), {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${key}` },
             body: formData
@@ -231,9 +236,8 @@ window.handleTripoImage = async function(event) {
         
         const imageToken = uploadData.data.image_token;
 
-        // Step 2: Create Task
         status.innerText = "Starting AI task...";
-        const taskRes = await fetch('https://api.tripo3d.ai/v1/task', {
+        const taskRes = await fetch(PROXY_URL + encodeURIComponent('https://api.tripo3d.ai/v1/task'), {
             method: 'POST',
             headers: { 
                 'Authorization': `Bearer ${key}`,
@@ -249,10 +253,9 @@ window.handleTripoImage = async function(event) {
         
         const taskId = taskData.data.task_id;
 
-        // Step 3: Polling
         const pollInterval = setInterval(async () => {
             status.innerText = "Processing AI model (polling)...";
-            const res = await fetch(`https://api.tripo3d.ai/v1/task/${taskId}`, {
+            const res = await fetch(PROXY_URL + encodeURIComponent(`https://api.tripo3d.ai/v1/task/${taskId}`), {
                 headers: { 'Authorization': `Bearer ${key}` }
             });
             const data = await res.json();
@@ -278,7 +281,8 @@ window.handleTripoImage = async function(event) {
 
 async function loadTripoModel(url) {
     const loader = new GLTFLoader();
-    loader.load(url, (gltf) => {
+    // Also use the proxy for model loading to avoid CORS issues on the generated asset URL
+    loader.load(PROXY_URL + encodeURIComponent(url), (gltf) => {
         processImportedObject(gltf.scene);
     });
 }
