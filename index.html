@@ -3,63 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MUD Engine | Persistence</title>
+    <title>GORE-MAXX | Invincible Grind</title>
     <style>
+        :root {
+            --obsidian: #0d0d0d;
+            --amber: #ff4500;
+            --blood: #8b0000;
+            --text: #f3f4f6;
+        }
         body {
-            background-color: #0c0c0c;
-            color: #00ff41;
+            background-color: var(--obsidian);
+            color: var(--text);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 20px;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             height: 100vh;
-            box-sizing: border-box;
+            overflow: hidden;
+            text-transform: uppercase;
         }
-        #terminal {
-            flex-grow: 1;
-            overflow-y: auto;
-            border: 1px solid #333;
-            padding: 10px;
-            margin-bottom: 10px;
-            white-space: pre-wrap;
+        #game-container {
+            width: 90%;
+            max-width: 500px;
+            border: 2px solid var(--amber);
+            padding: 20px;
+            background: rgba(20, 20, 20, 0.9);
+            box-shadow: 0 0 20px rgba(255, 69, 0, 0.2);
+            text-align: center;
         }
-        #input-area {
-            display: flex;
+        h1 {
+            color: var(--amber);
+            font-size: 2.5em;
+            margin: 0 0 10px 0;
+            letter-spacing: 5px;
+            text-shadow: 2px 2px var(--blood);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
+            margin: 20px 0;
+            border-top: 1px solid var(--amber);
+            padding-top: 20px;
         }
-        input {
-            background: #1a1a1a;
+        .stat-box {
             border: 1px solid #333;
-            color: #00ff41;
             padding: 10px;
-            flex-grow: 1;
-            font-family: inherit;
+            background: #151515;
         }
-        #stats {
-            display: flex;
-            gap: 20px;
-            font-size: 0.8em;
+        .stat-label {
+            font-size: 0.7em;
             color: #888;
-            margin-bottom: 10px;
         }
-        .system { color: #555; }
-        .error { color: #ff4141; }
-        .item { color: #ffb86c; }
+        .stat-value {
+            font-size: 1.2em;
+            color: var(--amber);
+            display: block;
+            margin-top: 5px;
+        }
+        #action-btn {
+            background: var(--amber);
+            color: var(--obsidian);
+            border: none;
+            padding: 20px;
+            width: 100%;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.1s;
+            clip-path: polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%);
+        }
+        #action-btn:active {
+            transform: scale(0.98);
+            background: var(--blood);
+            color: white;
+        }
+        #log {
+            height: 100px;
+            overflow-y: hidden;
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 20px;
+            text-align: left;
+            border-left: 2px solid var(--blood);
+            padding-left: 10px;
+        }
+        .xp-bar {
+            width: 100%;
+            height: 4px;
+            background: #222;
+            margin-top: 5px;
+        }
+        #xp-fill {
+            height: 100%;
+            background: var(--amber);
+            width: 0%;
+        }
     </style>
 </head>
 <body>
-    <div id="stats">
-        ID: <span id="stat-id">None</span> | 
-        Resolve: <span id="stat-resolve">0</span> | 
-        Reputation: <span id="stat-reputation">0</span>
-    </div>
-    <div id="terminal">Welcome to the MUD. Enter your Player ID to begin...</div>
-    <div id="input-area">
-        <span>></span>
-        <input type="text" id="cmd" autofocus>
+    <div id="game-container">
+        <h1>GORE-MAXX</h1>
+        <div class="stat-label">VILTRUMITE STATUS: <span id="level">1</span></div>
+        <div class="xp-bar"><div id="xp-fill"></div></div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="stat-label">RESOLVE</span>
+                <span class="stat-value" id="stat-resolve">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">DURABILITY</span>
+                <span class="stat-value" id="stat-durability">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">SPEED</span>
+                <span class="stat-value" id="stat-speed">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">TOTAL GORE</span>
+                <span class="stat-value" id="stat-gore">0</span>
+            </div>
+        </div>
+
+        <button id="action-btn">FIGHT</button>
+
+        <div id="log"></div>
     </div>
 
-    <script src="main.js"></script>
+    <script>
+        const state = JSON.parse(localStorage.getItem('goremax_save')) || {
+            level: 1,
+            xp: 0,
+            resolve: 0,
+            durability: 0,
+            speed: 0,
+            gore: 0
+        };
+
+        const btn = document.getElementById('action-btn');
+        const log = document.getElementById('log');
+
+        function updateUI() {
+            document.getElementById('level').innerText = state.level;
+            document.getElementById('stat-resolve').innerText = state.resolve;
+            document.getElementById('stat-durability').innerText = state.durability;
+            document.getElementById('stat-speed').innerText = state.speed;
+            document.getElementById('stat-gore').innerText = state.gore;
+            
+            const xpNeeded = state.level * 100;
+            const percent = (state.xp / xpNeeded) * 100;
+            document.getElementById('xp-fill').style.width = percent + '%';
+            
+            localStorage.setItem('goremax_save', JSON.stringify(state));
+        }
+
+        function addLog(msg) {
+            const div = document.createElement('div');
+            div.innerText = `> ${msg}`;
+            log.prepend(div);
+            if (log.children.length > 5) log.lastChild.remove();
+        }
+
+        btn.onclick = () => {
+            const gain = 1 + Math.floor(state.level / 2);
+            state.gore += gain;
+            state.xp += 10;
+            
+            // Random Stat Gain
+            const r = Math.random();
+            if (r > 0.7) {
+                state.resolve++;
+                addLog("THINK, MARK! RESOLVE INCREASED.");
+            } else if (r > 0.4) {
+                state.durability++;
+                addLog("SKIN HARDENS. DURABILITY UP.");
+            } else {
+                state.speed++;
+                addLog("BREAKING THE SOUND BARRIER.");
+            }
+
+            // Level Up
+            const xpNeeded = state.level * 100;
+            if (state.xp >= xpNeeded) {
+                state.xp -= xpNeeded;
+                state.level++;
+                addLog("VILTRUMITE POTENTIAL UNLOCKED. LEVEL UP.");
+            }
+
+            updateUI();
+        };
+
+        updateUI();
+        addLog("THE GRIND BEGINS.");
+    </script>
 </body>
 </html>
