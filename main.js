@@ -1,176 +1,83 @@
-/**
- * MUD Logic & GAS Integration (Multiplayer Edition)
- */
-
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyb6ICpsENWN3w1p2M3xb7n9mJfHWStPAxUGCPUzJ6JFI2HYOGJDPpYCF0sHwvYZCQt8g/exec';
-
-let player = {
-    username: null,
-    resolve: 0,
-    reputation: 0,
-    inventory: []
-};
-
-let lastEventTimestamp = 0;
-const terminal = document.getElementById('terminal');
-const input = document.getElementById('cmd');
-
-function log(text, className = '') {
-    const div = document.createElement('div');
-    div.className = className;
-    div.innerText = text;
-    terminal.appendChild(div);
-    terminal.scrollTop = terminal.scrollHeight;
-}
-
-async function api(action, payload = {}) {
-    if (!GAS_ENDPOINT || GAS_ENDPOINT.includes('YOUR_GOOGLE')) {
-        log('Error: GAS_ENDPOINT not configured in main.js', 'error');
-        return null;
+const postsData = [
+    {
+        id: 1,
+        username: "omni_man",
+        avatarText: "OM",
+        imageUrl: "https://via.placeholder.com/600/b71c1c/ffffff?text=Look+At+My+Power",
+        likes: 1250,
+        caption: "Thinking about the future. It's inevitable."
+    },
+    {
+        id: 2,
+        username: "cypher_dev",
+        avatarText: "CD",
+        imageUrl: "https://via.placeholder.com/600/1e88e5/ffffff?text=Code+Simulation",
+        likes: 840,
+        caption: "The matrix isn't built in a day. v5.5.8 is live."
+    },
+    {
+        id: 3,
+        username: "mark_inv",
+        avatarText: "MI",
+        imageUrl: "https://via.placeholder.com/600/ffeb3b/000000?text=Flying+High",
+        likes: 2100,
+        caption: "Training hard. Getting faster every day. #flight"
+    },
+    {
+        id: 4,
+        username: "sequid_zone",
+        avatarText: "SZ",
+        imageUrl: "https://via.placeholder.com/600/ff00ff/ffffff?text=Pink+Vibes",
+        likes: 45,
+        caption: "Just hanging out in the zone."
     }
+];
+
+const feedContainer = document.getElementById('feed');
+
+function createPostElement(post) {
+    const postDiv = document.createElement('article');
+    postDiv.className = 'post';
     
-    try {
-        const response = await fetch(GAS_ENDPOINT, {
-            method: 'POST',
-            body: JSON.stringify({
-                action,
-                username: player.username,
-                ...payload
-            })
-        });
-        return await response.json();
-    } catch (e) {
-        // Silent fail for polling to avoid spamming the terminal on intermittent connection drops
-        if (action !== 'poll') log('Connection error: ' + e.message, 'error');
-        return null;
-    }
+    postDiv.innerHTML = `
+        <div class="post-header">
+            <div class="avatar">${post.avatarText}</div>
+            <span class="username">${post.username}</span>
+        </div>
+        <div class="post-image-container">
+            <img class="post-image" src="${post.imageUrl}" alt="Post by ${post.username}">
+        </div>
+        <div class="post-actions">
+            <span class="action-btn like-btn">🤍</span>
+            <span class="action-btn">💬</span>
+            <span class="action-btn">✈️</span>
+        </div>
+        <div class="post-info">
+            <span class="likes-count">${post.likes} likes</span>
+            <div class="caption">
+                <span class="username">${post.username}</span>
+                ${post.caption}
+            </div>
+        </div>
+    `;
+
+    // Add simple interaction
+    const likeBtn = postDiv.querySelector('.like-btn');
+    let liked = false;
+    likeBtn.onclick = () => {
+        liked = !liked;
+        likeBtn.textContent = liked ? '❤️' : '🤍';
+        const likesCount = postDiv.querySelector('.likes-count');
+        likesCount.textContent = `${liked ? post.likes + 1 : post.likes} likes`;
+    };
+
+    return postDiv;
 }
 
-async function pollEvents() {
-    if (!player.username) return;
-    
-    const data = await api('poll', { lastTimestamp: lastEventTimestamp });
-    if (data && data.events) {
-        data.events.forEach(event => {
-            // Avoid logging our own actions that we've already logged locally
-            if (event.username !== player.username || event.type === 'chat') {
-                const time = new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                if (event.type === 'chat') {
-                    log(`[${time}] ${event.username}: ${event.text}`, 'chat-msg');
-                } else {
-                    log(`[${time}] ${event.text}`, 'system');
-                }
-            }
-            lastEventTimestamp = Math.max(lastEventTimestamp, event.timestamp);
-        });
-    }
-}
-
-async function login(username) {
-    player.username = username;
-    log(`Logging in as "${username}"...`, 'system');
-    
-    const data = await api('get_player');
-    if (data) {
-        player.resolve = data.resolve;
-        player.reputation = data.reputation;
-        player.inventory = data.inventory;
-        lastEventTimestamp = Date.now(); // Start polling from now
-        updateUI();
-        log('\n--- MULTIPLAYER SESSION START ---');
-        log(`Welcome back, ${username}. The simulation is live.`);
-        log('Commands: "explore", "rest", "inv", "/say <msg>", "clear"');
-        
-        // Announce join
-        await api('log_event', { text: `${username} joined the simulation.`, type: 'join' });
-        
-        // Start Polling
-        setInterval(pollEvents, 4000);
-    }
-}
-
-async function save() {
-    await api('save_player', {
-        stats: {
-            resolve: player.resolve,
-            reputation: player.reputation,
-            inventory: player.inventory
-        }
+function renderFeed() {
+    postsData.forEach(post => {
+        feedContainer.appendChild(createPostElement(post));
     });
 }
 
-function updateUI() {
-    document.getElementById('stat-id').innerText = player.username;
-    document.getElementById('stat-resolve').innerText = player.resolve;
-    document.getElementById('stat-reputation').innerText = player.reputation;
-}
-
-const commands = {
-    'explore': async () => {
-        if (player.resolve < 10) {
-            log('You are too exhausted to explore.', 'error');
-            return;
-        }
-        player.resolve -= 10;
-        const roll = Math.random();
-        let actionText = "";
-        
-        if (roll > 0.7) {
-            const item = 'Ancient Scrap';
-            player.inventory.push(item);
-            player.reputation += 1;
-            actionText = `${player.username} found an ${item} in the debris!`;
-            log(`You found an ${item}! Your reputation grows.`, 'item');
-        } else if (roll > 0.4) {
-            actionText = `${player.username} wandered the dark alleys but found nothing.`;
-            log('You wandered the dark alleys but found nothing but shadows.');
-        } else {
-            actionText = `${player.username} was tricked by a street urchin.`;
-            log('A street urchin tricks you. You lose focus.');
-            player.resolve -= 5;
-        }
-        
-        updateUI();
-        await save();
-        await api('log_event', { text: actionText, type: 'action' });
-    },
-    'rest': async () => {
-        log('You find a quiet corner and meditate.');
-        player.resolve = Math.min(100, player.resolve + 20);
-        updateUI();
-        await save();
-        await api('log_event', { text: `${player.username} is resting.`, type: 'action' });
-    },
-    'inv': () => {
-        log('Inventory: ' + (player.inventory.join(', ') || 'Empty'));
-    },
-    'clear': () => {
-        terminal.innerHTML = '';
-    }
-};
-
-input.addEventListener('keypress', async (e) => {
-    if (e.key === 'Enter') {
-        const val = input.value.trim();
-        input.value = '';
-        
-        if (!player.username) {
-            if (val) await login(val);
-            return;
-        }
-
-        if (val.startsWith('/say ')) {
-            const msg = val.substring(5);
-            log(`You: ${msg}`, 'chat-msg');
-            await api('log_event', { text: msg, type: 'chat' });
-            return;
-        }
-
-        const cmd = val.toLowerCase();
-        if (commands[cmd]) {
-            await commands[cmd]();
-        } else {
-            log(`Unknown command: ${cmd}`, 'system');
-        }
-    }
-});
+document.addEventListener('DOMContentLoaded', renderFeed);
