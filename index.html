@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exact Color Text Art</title>
+    <title>BBCode Pixel Art Generator</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -15,111 +15,131 @@
             flex-direction: column;
             align-items: center;
         }
-        h1 { color: #2c3e50; margin-bottom: 5px; text-align: center; }
-        p { color: #7f8c8d; margin-top: 0; text-align: center; margin-bottom: 20px; }
         .container {
             max-width: 800px; width: 100%; background: #ffffff;
             padding: 30px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); box-sizing: border-box;
         }
+        h1 { color: #2c3e50; margin-top: 0; text-align: center; }
+        p { color: #7f8c8d; text-align: center; margin-bottom: 20px; }
+        
         .controls {
             background: #f8f9fa; padding: 20px; border-radius: 8px;
             margin-bottom: 20px; border: 1px solid #e9ecef;
-            display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
         }
-        .control-group { display: flex; flex-direction: column; gap: 8px; }
-        label { font-weight: 600; font-size: 0.9rem; color: #495057; }
-        input[type="text"] {
-            padding: 6px; border-radius: 4px; border: 1px solid #ced4da;
-            width: 80px; font-family: monospace; text-align: center; font-size: 1rem;
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: 600; font-size: 0.85rem; color: #495057; }
+        
+        input[type="number"], input[type="text"], input[type="range"], input[type="file"] {
+            padding: 8px; border-radius: 4px; border: 1px solid #ced4da; font-family: inherit;
         }
-        select, input[type="range"], input[type="file"] {
-            padding: 5px; border-radius: 4px; border: 1px solid #ced4da; cursor: pointer;
+        
+        .stats {
+            text-align: center; font-weight: bold; font-size: 1.1rem;
+            margin: 15px 0; padding: 10px; border-radius: 6px;
+            background: #e3f2fd; color: #0d47a1;
         }
+        .stats.over-limit { background: #ffebee; color: #c62828; }
+        
+        textarea {
+            width: 100%; height: 200px; padding: 15px;
+            font-family: monospace; font-size: 12px;
+            border-radius: 8px; border: 1px solid #ced4da;
+            box-sizing: border-box; resize: vertical;
+        }
+        
         button {
             background-color: #3498db; color: white; border: none;
-            padding: 10px 20px; border-radius: 6px; font-weight: bold;
-            cursor: pointer; transition: 0.2s; margin-left: auto;
+            padding: 12px 20px; border-radius: 6px; font-weight: bold;
+            cursor: pointer; transition: 0.2s; width: 100%; margin-top: 10px;
         }
         button:hover { background-color: #2980b9; }
-        
-        /* The output area needs specific styling to keep characters perfectly aligned */
-        #output {
-            white-space: pre; 
-            font-family: monospace; 
-            line-height: 0.8; /* Tight line height keeps rows from having huge gaps */
-            letter-spacing: 0px; 
-            font-size: 10px; 
-            background: #111111;
-            padding: 20px; 
-            border-radius: 8px; 
-            overflow-x: auto;
-            max-width: 100%; 
-            box-sizing: border-box;
+
+        #preview {
+            white-space: pre; font-family: monospace; line-height: 0.8;
+            letter-spacing: 0px; font-size: 12px; background: #111;
+            padding: 20px; border-radius: 8px; overflow-x: auto;
+            color: #fff; margin-top: 20px; text-align: center;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Exact Color Text Art</h1>
-    <p>Turn photos into colored text characters with 100% color accuracy.</p>
+    <h1>BBCode Pixel Art Generator</h1>
+    <p>Optimized with grouping compression to fit strict character limits.</p>
     
     <div class="controls">
         <div class="control-group">
-            <label for="upload">1. Upload Image</label>
+            <label>1. Upload Image</label>
             <input type="file" id="upload" accept="image/*">
         </div>
         
         <div class="control-group">
-            <label for="resolution">2. Detail (<span id="resValue">60</span>px)</label>
-            <input type="range" id="resolution" min="20" max="150" value="60">
+            <label>2. Width Limit (px)</label>
+            <input type="number" id="widthInput" value="28" min="10" max="100">
         </div>
 
         <div class="control-group">
-            <label for="charInput">3. Custom Character</label>
-            <input type="text" id="charInput" value="█" maxlength="2"> 
+            <label>3. Color Simplification (<span id="simpText">High</span> compression)</label>
+            <input type="range" id="simplifySlider" min="1" max="128" value="64">
+            <small style="font-size:0.75rem; color:#777;">Higher = fewer colors, lower character count.</small>
         </div>
 
-        <button id="copyBtn">Copy HTML Code</button>
+        <div class="control-group">
+            <label>4. Pixel Character</label>
+            <input type="text" id="charInput" value="█" maxlength="2">
+        </div>
     </div>
 
-    <canvas id="canvas" style="display:none;"></canvas>
+    <div id="stats" class="stats">
+        Character Count: <span id="charCount">0</span> / 2000
+    </div>
+
+    <textarea id="output" readonly placeholder="BBCode will appear here..."></textarea>
+    <button id="copyBtn">Copy BBCode</button>
     
-    <div id="output">Your true-color text art will appear here...</div>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div id="preview">Preview will appear here...</div>
 </div>
 
 <script>
     const upload = document.getElementById('upload');
-    const resolution = document.getElementById('resolution');
-    const resValue = document.getElementById('resValue');
+    const widthInput = document.getElementById('widthInput');
+    const simplifySlider = document.getElementById('simplifySlider');
     const charInput = document.getElementById('charInput');
     const copyBtn = document.getElementById('copyBtn');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const output = document.getElementById('output');
+    const preview = document.getElementById('preview');
+    const stats = document.getElementById('stats');
+    const countDisplay = document.getElementById('charCount');
+    const simpText = document.getElementById('simpText');
 
     let currentImage = null;
 
-    // --- EVENT LISTENERS ---
+    // Listeners
     upload.addEventListener('change', handleUpload);
-    
-    resolution.addEventListener('input', (e) => {
-        resValue.textContent = e.target.value;
-        generateTextArt();
-    });
-    
+    widthInput.addEventListener('input', generateArt);
     charInput.addEventListener('input', () => {
-        if(charInput.value === '') charInput.value = ' '; // Default to space if empty
-        generateTextArt();
+        if(charInput.value === '') charInput.value = '█';
+        generateArt();
+    });
+    simplifySlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        if(val < 16) simpText.textContent = "Low";
+        else if(val < 64) simpText.textContent = "Medium";
+        else simpText.textContent = "High";
+        generateArt();
     });
 
-    // We copy the actual HTML code now, so you can paste it into a website
     copyBtn.addEventListener('click', () => {
-        if (!currentImage) return alert("Upload an image first!");
-        navigator.clipboard.writeText(output.innerHTML).then(() => {
-            copyBtn.textContent = "HTML Copied!";
-            setTimeout(() => { copyBtn.textContent = "Copy HTML Code"; }, 2000);
+        if (!output.value) return;
+        navigator.clipboard.writeText(output.value).then(() => {
+            copyBtn.textContent = "BBCode Copied!";
+            setTimeout(() => { copyBtn.textContent = "Copy BBCode"; }, 2000);
         });
     });
 
@@ -131,20 +151,30 @@
             const img = new Image();
             img.onload = () => {
                 currentImage = img;
-                generateTextArt();
+                generateArt();
             };
             img.src = event.target.result;
         };
         reader.readAsDataURL(file);
     }
 
-    function generateTextArt() {
+    // Convert RGB to 6-digit Hex
+    function rgbToHex(r, g, b) {
+        return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+    }
+
+    // Quantize color to reduce unique colors (aids compression)
+    function simplifyColor(val, factor) {
+        return Math.min(255, Math.round(val / factor) * factor);
+    }
+
+    function generateArt() {
         if (!currentImage) return;
 
-        const targetWidth = parseInt(resolution.value);
-        // Characters are usually twice as tall as they are wide. 0.5 fixes the stretch.
-        const targetHeight = Math.round((currentImage.height / currentImage.width) * targetWidth * 0.5);
-        
+        const targetWidth = parseInt(widthInput.value) || 28;
+        // Text is generally twice as tall as wide. 0.5 fixes distortion.
+        const targetHeight = Math.max(1, Math.round((currentImage.height / currentImage.width) * targetWidth * 0.5));
+        const factor = parseInt(simplifySlider.value);
         const pixelChar = charInput.value || '█'; 
 
         canvas.width = targetWidth;
@@ -153,31 +183,74 @@
 
         const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight).data;
         
-        // We will build a giant string of HTML <span> tags
-        let resultHTML = "";
+        let bbCodeResult = "";
+        let previewHTML = "";
 
         for (let y = 0; y < targetHeight; y++) {
+            let rowBB = "";
+            let rowHTML = "";
+            let currentColor = null;
+            let currentRunLength = 0;
+
             for (let x = 0; x < targetWidth; x++) {
                 const idx = (y * targetWidth + x) * 4;
-                const r = imgData[idx];
-                const g = imgData[idx + 1];
-                const b = imgData[idx + 2];
-                const a = imgData[idx + 3];
+                let r = imgData[idx];
+                let g = imgData[idx + 1];
+                let b = imgData[idx + 2];
+                let a = imgData[idx + 3];
 
-                // If pixel is mostly transparent, leave an empty space
+                let hex;
                 if (a < 128) {
-                    resultHTML += `<span style="color: transparent;">${pixelChar}</span>`;
-                    continue;
+                    hex = "transparent";
+                } else {
+                    r = simplifyColor(r, factor);
+                    g = simplifyColor(g, factor);
+                    b = simplifyColor(b, factor);
+                    hex = rgbToHex(r, g, b);
                 }
 
-                // Apply the exact RGB color to the user's custom character
-                resultHTML += `<span style="color: rgb(${r},${g},${b});">${pixelChar}</span>`;
+                // If the color changes, close the previous tag and open a new one
+                if (hex !== currentColor) {
+                    if (currentColor !== null) {
+                        rowBB += currentColor === "transparent" ? "" : "[/color]";
+                        rowHTML += currentColor === "transparent" ? "" : "</span>";
+                    }
+                    if (hex !== "transparent") {
+                        rowBB += `[color=${hex}]`;
+                        rowHTML += `<span style="color:${hex}">`;
+                    }
+                    currentColor = hex;
+                }
+
+                rowBB += hex === "transparent" ? " " : pixelChar;
+                rowHTML += hex === "transparent" ? " " : pixelChar;
             }
-            resultHTML += "\n";
+
+            // Close trailing tags at end of row
+            if (currentColor !== null) {
+                rowBB += currentColor === "transparent" ? "" : "[/color]";
+                rowHTML += currentColor === "transparent" ? "" : "</span>";
+            }
+            
+            bbCodeResult += rowBB + "\n";
+            previewHTML += rowHTML + "\n";
         }
         
-        // Because we are using HTML tags, we must use .innerHTML instead of .textContent
-        output.innerHTML = resultHTML;
+        // Remove the very last newline to save 1 char
+        bbCodeResult = bbCodeResult.trimEnd();
+
+        output.value = bbCodeResult;
+        preview.innerHTML = previewHTML;
+
+        // Update stats
+        const len = bbCodeResult.length;
+        countDisplay.textContent = len;
+        
+        if (len > 2000) {
+            stats.classList.add('over-limit');
+        } else {
+            stats.classList.remove('over-limit');
+        }
     }
 </script>
 
