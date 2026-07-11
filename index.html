@@ -3,26 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sovereign Feed</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Photo to Emoji Pixel Art</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        p {
+            color: #7f8c8d;
+            margin-top: 0;
+        }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .controls {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        label {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        #output {
+            white-space: pre;
+            font-family: monospace;
+            line-height: 1.1;
+            letter-spacing: 1px;
+            font-size: 8px;
+            background: #111111;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            max-width: 100%;
+            margin-top: 20px;
+            color: #ffffff;
+            text-align: left;
+            box-sizing: border-box;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-content">
-            <h1 class="logo">Sovereign</h1>
-            <div class="nav-icons">
-                <span class="icon">🏠</span>
-                <span class="icon">🔍</span>
-                <span class="icon">❤️</span>
-                <span class="icon">👤</span>
-            </div>
+
+<div class="container">
+    <h1>Emoji Pixel Art Generator</h1>
+    <p>Upload an image to convert it into emoji mosaic art.</p>
+    
+    <div class="controls">
+        <input type="file" id="upload" accept="image/*"><br>
+        
+        <div class="slider-group">
+            <label for="resolution">Width (in emojis):</label>
+            <input type="range" id="resolution" min="15" max="80" value="45">
+            <span id="resValue">45</span>
         </div>
-    </nav>
+    </div>
 
-    <main class="feed-container" id="feed">
-        <!-- Posts will be injected here -->
-    </main>
+    <canvas id="canvas" style="display:none;"></canvas>
+    
+    <div id="output">Your emoji art will appear here...</div>
+</div>
 
-    <script src="main.js"></script>
+<script>
+    const upload = document.getElementById('upload');
+    const resolution = document.getElementById('resolution');
+    const resValue = document.getElementById('resValue');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const output = document.getElementById('output');
+
+    // Definition of the emoji color palette and their approximate RGB values
+    const emojiPalette = [
+        { emoji: '🔴', r: 224, g: 36, b: 94 },   // Red
+        { emoji: '🟠', r: 244, g: 144, b: 12 },  // Orange
+        { emoji: '🟡', r: 255, g: 204, b: 77 },  // Yellow
+        { emoji: '🟢', r: 119, g: 178, b: 85 },  // Green
+        { emoji: '🔵', r: 59, g: 148, b: 216 },  // Blue
+        { emoji: '🟣', r: 170, g: 142, b: 214 }, // Purple
+        { emoji: '🟤', r: 193, g: 105, b: 79 },  // Brown
+        { emoji: '⚫', r: 35, g: 37, b: 40 },    // Black
+        { emoji: '⚪', r: 230, g: 236, b: 240 }  // White
+    ];
+
+    let currentImage = null;
+
+    // Handle image upload
+    upload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                currentImage = img;
+                generateEmojiArt();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Update dynamically when slider moves
+    resolution.addEventListener('input', (e) => {
+        resValue.textContent = e.target.value;
+        if (currentImage) {
+            generateEmojiArt();
+        }
+    });
+
+    function generateEmojiArt() {
+        if (!currentImage) return;
+
+        const targetWidth = parseInt(resolution.value);
+        
+        // Emojis are slightly taller than they are wide. 
+        // Multiplying by 0.65 helps fix aspect ratio distortion.
+        const targetHeight = Math.round((currentImage.height / currentImage.width) * targetWidth * 0.65);
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        // Resize the image down onto the canvas to get averaged color blocks
+        ctx.drawImage(currentImage, 0, 0, targetWidth, targetHeight);
+
+        const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight).data;
+        let resultStr = "";
+
+        for (let y = 0; y < targetHeight; y++) {
+            for (let x = 0; x < targetWidth; x++) {
+                const idx = (y * targetWidth + x) * 4;
+                const r = imgData[idx];
+                const g = imgData[idx + 1];
+                const b = imgData[idx + 2];
+                const a = imgData[idx + 3];
+
+                // If pixel is mostly transparent, use a white circle emoji
+                if (a < 128) {
+                    resultStr += '⚪';
+                    continue;
+                }
+
+                resultStr += getClosestEmoji(r, g, b);
+            }
+            resultStr += "\n"; // New line at the end of every pixel row
+        }
+
+        output.textContent = resultStr;
+    }
+
+    // Calculates Euclidean distance in RGB color space to find the closest match
+    function getClosestEmoji(r, g, b) {
+        let minDistance = Infinity;
+        let closestEmoji = '⚫';
+
+        for (const item of emojiPalette) {
+            const distance = Math.sqrt(
+                Math.pow(r - item.r, 2) +
+                Math.pow(g - item.g, 2) +
+                Math.pow(b - item.b, 2)
+            );
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestEmoji = item.emoji;
+            }
+        }
+
+        return closestEmoji;
+    }
+</script>
+
 </body>
 </html>
